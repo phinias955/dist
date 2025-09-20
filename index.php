@@ -7,5 +7,5 @@ if (isLoggedIn()) {
 } else {
     header('Location: login.php');
 }
-exit();
+exit(); 
 ?>

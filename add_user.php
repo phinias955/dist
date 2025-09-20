@@ -12,7 +12,7 @@ if (!canAccessPage('users')) {
 $page_title = 'Add New User';
 
 $message = '';
-$error = '';
+$error = ''; 
 
 // Get accessible wards and villages for assignment based on user role
 $wards = getAccessibleWards();

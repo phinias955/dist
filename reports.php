@@ -111,24 +111,98 @@ if (isset($_GET['export'])) {
     $export_format = $_GET['export'];
     
     if ($export_format === 'pdf') {
-        // Generate PDF report using simple HTML to PDF conversion
+        // Generate print-friendly HTML for PDF conversion
         $html = '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>' . $report_title . '</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        h2 { color: #666; margin-top: 30px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .header-info { margin: 20px 0; }
-        .header-info p { margin: 5px 0; }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            line-height: 1.4;
+        }
+        h1 { 
+            color: #333; 
+            border-bottom: 2px solid #333; 
+            padding-bottom: 10px; 
+            margin-bottom: 20px;
+        }
+        h2 { 
+            color: #666; 
+            margin-top: 30px; 
+            margin-bottom: 15px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            font-size: 12px;
+        }
+        th, td { 
+            border: 1px solid #333; 
+            padding: 6px; 
+            text-align: left; 
+            vertical-align: top;
+        }
+        th { 
+            background-color: #f5f5f5; 
+            font-weight: bold; 
+            font-size: 11px;
+        }
+        .header-info { 
+            margin: 20px 0; 
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+        .header-info p { 
+            margin: 5px 0; 
+            font-size: 13px;
+        }
+        .print-instructions {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .print-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .print-button:hover {
+            background-color: #0056b3;
+        }
     </style>
+    <script>
+        function printReport() {
+            window.print();
+        }
+    </script>
 </head>
 <body>
+    <div class="no-print">
+        <div class="print-instructions">
+            <strong>Instructions:</strong> Click the "Print Report" button below to open the print dialog. 
+            In the print dialog, select "Save as PDF" as your destination to generate a PDF file.
+        </div>
+        <button class="print-button" onclick="printReport()">🖨️ Print Report</button>
+    </div>
+    
     <h1>' . $report_title . '</h1>
     <div class="header-info">
         <p><strong>Generated on:</strong> ' . date('Y-m-d H:i:s') . '</p>
@@ -184,11 +258,10 @@ if (isset($_GET['export'])) {
         
         $html .= '</body></html>';
         
-        // Set headers for PDF download
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="residence_report_' . date('Y-m-d_H-i-s') . '.pdf"');
+        // Set headers for HTML display (not PDF)
+        header('Content-Type: text/html; charset=UTF-8');
         
-        // For now, output HTML that can be printed as PDF by browser
+        // Output HTML that can be printed as PDF by browser
         echo $html;
         exit();
         
@@ -282,122 +355,645 @@ if (isset($_GET['export'])) {
 include 'includes/header.php';
 ?>
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="page-title-box">
-                <h4 class="page-title">Reports</h4>
-                <div class="page-title-right">
-                    <ol class="breadcrumb m-0">
-                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                        <li class="breadcrumb-item active">Reports</li>
-                    </ol>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Residence Reports</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #6c757d;
+            --success: #198754;
+            --info: #0dcaf0;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f7fb;
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .reports-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .reports-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #5e72e4 100%);
+            border-radius: var(--border-radius);
+            padding: 25px 30px;
+            color: white;
+            margin-bottom: 24px;
+            box-shadow: var(--box-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reports-header::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .reports-header::after {
+            content: '';
+            position: absolute;
+            bottom: -80px;
+            left: -80px;
+            width: 250px;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header-title h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .header-title p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .export-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            text-decoration: none;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .export-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+
+        .stat-card:nth-child(1) .stat-icon {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+
+        .stat-card:nth-child(2) .stat-icon {
+            background: rgba(25, 135, 84, 0.1);
+            color: var(--success);
+        }
+
+        .stat-card:nth-child(3) .stat-icon {
+            background: rgba(255, 193, 7, 0.1);
+            color: var(--warning);
+        }
+
+        .stat-card:nth-child(4) .stat-icon {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: var(--gray-800);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        /* Report Content */
+        .report-content {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .report-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .report-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .report-info {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .report-info span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background-color: var(--gray-100);
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-700);
+            font-size: 14px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover {
+            background-color: var(--gray-100);
+        }
+
+        /* Badges and Status */
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-primary {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+
+        .badge-success {
+            background: rgba(25, 135, 84, 0.1);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(255, 193, 7, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-info {
+            background: rgba(13, 202, 240, 0.1);
+            color: var(--info);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: var(--gray-300);
+        }
+
+        .empty-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--gray-600);
+        }
+
+        .empty-desc {
+            color: var(--gray-500);
+            max-width: 500px;
+            margin: 0 auto 30px;
+        }
+
+        .empty-actions .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .empty-actions .btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .reports-container {
+                padding: 15px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .report-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .report-info {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .reports-header {
+                padding: 20px;
+            }
+            
+            .header-title h1 {
+                font-size: 24px;
+            }
+            
+            .export-btn {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Loading State */
+        .loading {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Print Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .report-content, .report-content * {
+                visibility: visible;
+            }
+            .report-content {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="reports-container">
+        <!-- Header Section -->
+        <div class="reports-header fade-in">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1><i class="fas fa-chart-line me-2"></i> <?php echo $report_title; ?></h1>
+                    <p><?php echo $report_subtitle; ?></p>
+                </div>
+                <div class="header-actions">
+                    <a href="?export=pdf" class="export-btn">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <a href="?export=excel" class="export-btn">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </a>
+                    <a href="?export=csv" class="export-btn">
+                        <i class="fas fa-file-csv"></i> CSV
+                    </a>
+                    <a href="reports_dashboard.php" class="export-btn">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </a>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title"><?php echo $report_title; ?></h4>
-                    <p class="text-muted"><?php echo $report_subtitle; ?></p>
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card fade-in" style="animation-delay: 0.1s;">
+                <div class="stat-icon">
+                    <i class="fas fa-database"></i>
                 </div>
-                <div class="card-body">
-                    <?php if (isset($error_message)): ?>
-                        <div class="alert alert-danger">
-                            <?php echo $error_message; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h5>Export Options</h5>
-                                <div class="btn-group" role="group">
-                                    <a href="?export=pdf" class="btn btn-danger">
-                                        <i class="mdi mdi-file-pdf"></i> Export PDF
-                                    </a>
-                                    <a href="?export=excel" class="btn btn-success">
-                                        <i class="mdi mdi-file-excel"></i> Export Excel
-                                    </a>
-                                    <a href="?export=csv" class="btn btn-info">
-                                        <i class="mdi mdi-file-csv"></i> Export CSV
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="col-md-6 text-right">
-                                <p class="text-muted">
-                                    <strong>Generated on:</strong> <?php echo date('Y-m-d H:i:s'); ?><br>
-                                    <strong>Generated by:</strong> <?php echo $_SESSION['username']; ?> (<?php echo getRoleDisplayName($user_role); ?>)
-                                </p>
-                            </div>
-                        </div>
-
-                        <?php if (!empty($report_data)): ?>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-bordered">
-                                    <thead class="thead-dark">
-                                        <tr>
-                                            <?php if ($user_role === 'veo'): ?>
-                                                <th>Resident Name</th>
-                                                <th>House No</th>
-                                                <th>Gender</th>
-                                                <th>Date of Birth</th>
-                                                <th>NIDA Number</th>
-                                                <th>Phone</th>
-                                                <th>Occupation</th>
-                                                <th>Ownership</th>
-                                                <th>Education Level</th>
-                                                <th>Employment Status</th>
-                                                <th>Family Members</th>
-                                            <?php else: ?>
-                                                <th>Location</th>
-                                                <th>Residences</th>
-                                                <th>Family Members</th>
-                                            <?php endif; ?>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($report_data as $row): ?>
-                                            <tr>
-                                                <?php if ($user_role === 'veo'): ?>
-                                                    <td><?php echo htmlspecialchars($row['resident_name']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['house_no']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['gender']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['date_of_birth']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['nida_number']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['phone']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['occupation']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['ownership']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['education_level']); ?></td>
-                                                    <td><?php echo htmlspecialchars($row['employment_status']); ?></td>
-                                                    <td><?php echo $row['family_member_count']; ?></td>
-                                                <?php else: ?>
-                                                    <td><?php echo htmlspecialchars($row['village_name'] ?? $row['ward_name']); ?></td>
-                                                    <td><?php echo $row['residence_count']; ?></td>
-                                                    <td><?php echo $row['family_member_count']; ?></td>
-                                                <?php endif; ?>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="alert alert-info">
-                                <h5>No Data Available</h5>
-                                <p>No data found for the selected criteria. This could be because:</p>
-                                <ul>
-                                    <li>No residences have been registered yet</li>
-                                    <li>No data matches your current role and location assignment</li>
-                                    <li>There was an error retrieving the data</li>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                <div class="stat-value"><?php echo count($report_data); ?></div>
+                <div class="stat-label">Total Records</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.2s;">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-alt"></i>
                 </div>
+                <div class="stat-value"><?php echo date('M d, Y'); ?></div>
+                <div class="stat-label">Report Date</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.3s;">
+                <div class="stat-icon">
+                    <i class="fas fa-user-tag"></i>
+                </div>
+                <div class="stat-value"><?php echo getRoleDisplayName($user_role); ?></div>
+                <div class="stat-label">Your Role</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.4s;">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-value"><?php echo date('H:i'); ?></div>
+                <div class="stat-label">Current Time</div>
             </div>
         </div>
-    </div>
-</div>
 
-<?php include 'includes/footer.php'; ?>
+        <!-- Report Content -->
+        <div class="report-content fade-in" style="animation-delay: 0.5s;">
+            <div class="report-header">
+                <h2 class="report-title">Detailed Report Data</h2>
+                <div class="report-info">
+                    <span><i class="fas fa-user-circle"></i> <?php echo $_SESSION['username']; ?></span>
+                    <span><i class="fas fa-clock"></i> <?php echo date('F j, Y, g:i a'); ?></span>
+                    <span><i class="fas fa-list"></i> <?php echo count($report_data); ?> records</span>
+                </div>
+            </div>
+
+            <?php if (isset($error_message)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h3 class="empty-title">Error Generating Report</h3>
+                    <p class="empty-desc"><?php echo $error_message; ?></p>
+                    <div class="empty-actions">
+                        <a href="reports_dashboard.php" class="btn">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            <?php elseif (!empty($report_data)): ?>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <?php if ($user_role === 'veo'): ?>
+                                    <th>Resident Name</th>
+                                    <th>House No</th>
+                                    <th>Gender</th>
+                                    <th>Date of Birth</th>
+                                    <th>NIDA Number</th>
+                                    <th>Phone</th>
+                                    <th>Occupation</th>
+                                    <th>Ownership</th>
+                                    <th>Education</th>
+                                    <th>Employment</th>
+                                    <th>Family Members</th>
+                                <?php else: ?>
+                                    <th>Location</th>
+                                    <th>Residences</th>
+                                    <th>Family Members</th>
+                                <?php endif; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($report_data as $index => $row): ?>
+                                <tr>
+                                    <?php if ($user_role === 'veo'): ?>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar-circle me-2">
+                                                    <?php echo strtoupper(substr($row['resident_name'], 0, 1)); ?>
+                                                </div>
+                                                <?php echo htmlspecialchars($row['resident_name']); ?>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge badge-primary"><?php echo htmlspecialchars($row['house_no']); ?></span></td>
+                                        <td>
+                                            <span class="badge <?php echo $row['gender'] === 'Male' ? 'badge-info' : 'badge-warning'; ?>">
+                                                <?php echo htmlspecialchars($row['gender']); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($row['date_of_birth']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['nida_number']); ?></td>
+                                        <td>
+                                            <a href="tel:<?php echo htmlspecialchars($row['phone']); ?>" class="text-primary">
+                                                <i class="fas fa-phone-alt me-1"></i> <?php echo htmlspecialchars($row['phone']); ?>
+                                            </a>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($row['occupation']); ?></td>
+                                        <td>
+                                            <span class="badge <?php echo $row['ownership'] === 'Owner' ? 'badge-success' : 'badge-secondary'; ?>">
+                                                <?php echo htmlspecialchars($row['ownership']); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($row['education_level']); ?></td>
+                                        <td>
+                                            <span class="badge <?php echo $row['employment_status'] === 'Employed' ? 'badge-success' : 'badge-danger'; ?>">
+                                                <?php echo htmlspecialchars($row['employment_status']); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary">
+                                                <i class="fas fa-users me-1"></i> <?php echo $row['family_member_count']; ?>
+                                            </span>
+                                        </td>
+                                    <?php else: ?>
+                                        <td>
+                                            <i class="fas fa-map-marker-alt text-danger me-2"></i>
+                                            <?php echo htmlspecialchars($row['village_name'] ?? $row['ward_name']); ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-home me-1"></i> <?php echo $row['residence_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-success">
+                                                <i class="fas fa-users me-1"></i> <?php echo $row['family_member_count']; ?>
+                                            </span>
+                                        </td>
+                                    <?php endif; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-inbox"></i>
+                    </div>
+                    <h3 class="empty-title">No Data Available</h3>
+                    <p class="empty-desc">No records found for the selected criteria. This could be because no residences have been registered yet or there was an issue retrieving the data.</p>
+                    <div class="empty-actions">
+                        <a href="reports_dashboard.php" class="btn">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                        <a href="dashboard.php" class="btn" style="background: var(--secondary);">
+                            <i class="fas fa-home"></i> Go to Dashboard
+                        </a>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <script>

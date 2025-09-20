@@ -24,7 +24,7 @@ $report_data = [];
 $report_title = '';
 $report_subtitle = '';
 
-try {
+try { 
     if ($user_role === 'super_admin') {
         // Super Admin sees all transfers
         $report_title = 'Transfer Report - System Wide';
@@ -244,11 +244,10 @@ if (isset($_GET['export'])) {
         
         $html .= '</body></html>';
         
-        // Set headers for PDF download
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="transfer_report_' . date('Y-m-d_H-i-s') . '.pdf"');
+        // Set headers for HTML display (not PDF)
+        header('Content-Type: text/html; charset=UTF-8');
         
-        // For now, output HTML that can be printed as PDF by browser
+        // Output HTML that can be printed as PDF by browser
         echo $html;
         exit();
         
@@ -330,29 +329,405 @@ if (isset($_GET['export'])) {
 include 'includes/header.php';
 ?>
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="page-title-box">
-                <h4 class="page-title">Transfer Report</h4>
-                <div class="page-title-right">
-                    <ol class="breadcrumb m-0">
-                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="reports_dashboard.php">Reports</a></li>
-                        <li class="breadcrumb-item active">Transfer Report</li>
-                    </ol>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo $report_title; ?> - Residence Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #6c757d;
+            --success: #198754;
+            --info: #0dcaf0;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f7fb;
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Hero Section */
+        .dashboard-hero {
+            background: linear-gradient(135deg, var(--primary) 0%, #5e72e4 100%);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            color: white;
+            margin-bottom: 24px;
+            box-shadow: var(--box-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .hero-pattern {
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .hero-pattern::after {
+            content: '';
+            position: absolute;
+            bottom: -80px;
+            left: -80px;
+            width: 250px;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 50px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hero-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .title-highlight {
+            color: #ffd166;
+        }
+
+        .hero-description {
+            font-size: 16px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin-bottom: 24px;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+        }
+
+        .cta-button.primary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .cta-button.primary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .cta-button.secondary {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .cta-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Data Table */
+        .data-table-container {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--gray-800), var(--gray-700));
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .record-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .modern-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .modern-table thead th {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .modern-table tbody tr {
+            transition: var(--transition);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .modern-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .modern-table tbody td {
+            padding: 16px 12px;
+            vertical-align: middle;
+        }
+
+        .data-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .data-badge.primary {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+
+        .data-badge.success {
+            background: rgba(25, 135, 84, 0.1);
+            color: var(--success);
+        }
+
+        .data-badge.warning {
+            background: rgba(255, 193, 7, 0.1);
+            color: var(--warning);
+        }
+
+        .data-badge.info {
+            background: rgba(13, 202, 240, 0.1);
+            color: var(--info);
+        }
+
+        .data-badge.danger {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .data-badge.secondary {
+            background: rgba(108, 117, 125, 0.1);
+            color: var(--secondary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #b8860b;
+        }
+
+        .status-badge.approved {
+            background: rgba(25, 135, 84, 0.2);
+            color: var(--success);
+        }
+
+        .status-badge.completed {
+            background: rgba(13, 202, 240, 0.2);
+            color: var(--info);
+        }
+
+        .status-badge.rejected {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+
+        .location-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .location-info .data-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 15px;
+            }
+            
+            .dashboard-hero {
+                padding: 20px;
+            }
+            
+            .hero-title {
+                font-size: 24px;
+            }
+            
+            .hero-actions {
+                flex-direction: column;
+            }
+            
+            .modern-table {
+                font-size: 12px;
+            }
+            
+            .modern-table thead th,
+            .modern-table tbody td {
+                padding: 12px 8px;
+            }
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Hero Section -->
+        <div class="dashboard-hero fade-in">
+            <div class="hero-background">
+                <div class="hero-pattern"></div>
+            </div>
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="badge-icon">🔄</span>
+                    <span class="badge-text">Transfer Report</span>
+                </div>
+                <h1 class="hero-title">
+                    <?php echo $report_title; ?>
+                    <span class="title-highlight">Transfers</span>
+                </h1>
+                <p class="hero-description">
+                    <?php echo $report_subtitle; ?><br>
+                    Track all residence transfers and movements across different locations.
+                </p>
+                <div class="hero-actions">
+                    <a href="?export=pdf" class="cta-button primary">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>Export PDF</span>
+                    </a>
+                    <a href="?export=excel" class="cta-button secondary">
+                        <i class="fas fa-file-excel"></i>
+                        <span>Export Excel</span>
+                    </a>
+                    <a href="?export=csv" class="cta-button secondary">
+                        <i class="fas fa-file-csv"></i>
+                        <span>Export CSV</span>
+                    </a>
+                    <a href="reports_dashboard.php" class="cta-button secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back to Reports</span>
+                    </a>
                 </div>
             </div>
         </div>
-    </div>
 
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title"><?php echo $report_title; ?></h4>
-                    <p class="text-muted"><?php echo $report_subtitle; ?></p>
-                </div>
+               
                 <div class="card-body">
                     <?php if (isset($error_message)): ?>
                         <div class="alert alert-danger">
@@ -361,18 +736,7 @@ include 'includes/header.php';
                     <?php else: ?>
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <h5>Export Options</h5>
-                                <div class="btn-group" role="group">
-                                    <a href="?export=pdf" class="btn btn-danger">
-                                        <i class="mdi mdi-file-pdf"></i> Export PDF
-                                    </a>
-                                    <a href="?export=excel" class="btn btn-success">
-                                        <i class="mdi mdi-file-excel"></i> Export Excel
-                                    </a>
-                                    <a href="?export=csv" class="btn btn-info">
-                                        <i class="mdi mdi-file-csv"></i> Export CSV
-                                    </a>
-                                </div>
+  
                             </div>
                             <div class="col-md-6 text-right">
                                 <p class="text-muted">
@@ -384,41 +748,65 @@ include 'includes/header.php';
                         </div>
 
                         <?php if (!empty($report_data)): ?>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-bordered">
-                                    <thead class="thead-dark">
-                                        <tr>
-                                            <th>Transfer ID</th>
-                                            <th>Resident Name</th>
-                                            <th>House No</th>
-                                            <th>From Location</th>
-                                            <th>To Location</th>
-                                            <th>Status</th>
-                                            <th>Requested By</th>
-                                            <th>Request Date</th>
-                                            <th>Reason</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($report_data as $row): ?>
+                            <div class="data-table-container fade-in">
+                                <div class="table-header">
+                                    <h3>
+                                        <i class="fas fa-exchange-alt me-2"></i>
+                                        Transfer Report Data
+                                    </h3>
+                                    <span class="record-count"><?php echo count($report_data); ?> transfers</span>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table class="modern-table">
+                                        <thead>
                                             <tr>
-                                                <td><?php echo $row['id']; ?></td>
-                                                <td><?php echo htmlspecialchars($row['resident_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['house_no']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['from_ward_name'] . ', ' . $row['from_village_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['to_ward_name'] . ', ' . $row['to_village_name']); ?></td>
-                                                <td>
-                                                    <span class="badge badge-<?php echo getStatusColor($row['status']); ?>">
-                                                        <?php echo getStatusDisplay($row['status']); ?>
-                                                    </span>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($row['requested_by_username']); ?></td>
-                                                <td><?php echo date('Y-m-d H:i', strtotime($row['created_at'])); ?></td>
-                                                <td><?php echo htmlspecialchars($row['reason']); ?></td>
+                                                <th><i class="fas fa-hashtag me-2"></i>Transfer ID</th>
+                                                <th><i class="fas fa-user me-2"></i>Resident Name</th>
+                                                <th><i class="fas fa-home me-2"></i>House No</th>
+                                                <th><i class="fas fa-map-marker-alt me-2"></i>From Location</th>
+                                                <th><i class="fas fa-arrow-right me-2"></i>To Location</th>
+                                                <th><i class="fas fa-info-circle me-2"></i>Status</th>
+                                                <th><i class="fas fa-user-tie me-2"></i>Requested By</th>
+                                                <th><i class="fas fa-calendar me-2"></i>Request Date</th>
+                                                <th><i class="fas fa-comment me-2"></i>Reason</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($report_data as $row): ?>
+                                                <tr>
+                                                    <td>
+                                                        <span class="data-badge primary">#<?php echo $row['id']; ?></span>
+                                                    </td>
+                                                    <td class="fw-medium"><?php echo htmlspecialchars($row['resident_name']); ?></td>
+                                                    <td>
+                                                        <span class="data-badge success"><?php echo htmlspecialchars($row['house_no']); ?></span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="location-info">
+                                                            <div class="data-badge warning"><?php echo htmlspecialchars($row['from_ward_name']); ?></div>
+                                                            <div class="data-badge info"><?php echo htmlspecialchars($row['from_village_name']); ?></div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div class="location-info">
+                                                            <div class="data-badge warning"><?php echo htmlspecialchars($row['to_ward_name']); ?></div>
+                                                            <div class="data-badge info"><?php echo htmlspecialchars($row['to_village_name']); ?></div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="status-badge <?php echo strtolower($row['status']); ?>">
+                                                            <i class="fas fa-<?php echo getStatusIcon($row['status']); ?> me-1"></i>
+                                                            <?php echo getStatusDisplay($row['status']); ?>
+                                                        </span>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($row['requested_by_username']); ?></td>
+                                                    <td><?php echo date('Y-m-d H:i', strtotime($row['created_at'])); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['transfer_reason'] ?? 'N/A'); ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         <?php else: ?>
                             <div class="alert alert-info">

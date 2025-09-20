@@ -24,7 +24,7 @@ try {
                u.full_name as registered_by_name
         FROM residences r
         LEFT JOIN wards w ON r.ward_id = w.id
-        LEFT JOIN villages v ON r.village_id = v.id
+        LEFT JOIN villages v ON r.village_id = v.id 
         LEFT JOIN users u ON r.registered_by = u.id
         WHERE r.id = ?
     ");

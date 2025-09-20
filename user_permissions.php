@@ -25,7 +25,7 @@ try {
 
 // Get selected user
 $selected_user = null;
-$user_permissions = [];
+$user_permissions = []; 
 $modules = [];
 
 if (isset($_GET['user_id']) && is_numeric($_GET['user_id'])) {

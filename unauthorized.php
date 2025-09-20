@@ -24,3 +24,4 @@ require_once 'includes/functions.php';
     </div>
 </body>
 </html>
+ 

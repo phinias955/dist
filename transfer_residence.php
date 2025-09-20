@@ -29,7 +29,7 @@ try {
     ");
     $stmt->execute([$residence_id]);
     $residence = $stmt->fetch();
-    
+     
     // Check for existing active transfer
     $stmt = $pdo->prepare("
         SELECT rt.id, rt.status, rt.transfer_type, 
