@@ -42,12 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (isSuperAdmin()) {
                 $can_approve = true;
-            } elseif ($_SESSION['user_role'] === 'weo' && $transfer['from_ward_id'] == $user_location['ward_id']) {
-                $can_approve = true;
-            } elseif ($_SESSION['user_role'] === 'admin' && $transfer['to_ward_id'] == $user_location['ward_id']) {
-                $can_approve = true;
-            } elseif ($_SESSION['user_role'] === 'veo' && $transfer['to_village_id'] == $user_location['village_id']) {
-                $can_approve = true;
+            } elseif ($_SESSION['user_role'] === 'weo') {
+                // WEO can approve transfers from their ward OR to their ward
+                $can_approve = ($transfer['from_ward_id'] == $user_location['ward_id'] || $transfer['to_ward_id'] == $user_location['ward_id']);
+            } elseif ($_SESSION['user_role'] === 'admin') {
+                // Ward admin can approve transfers to their ward (after WEO approval)
+                $can_approve = ($transfer['to_ward_id'] == $user_location['ward_id']);
+            } elseif ($_SESSION['user_role'] === 'veo') {
+                // VEO can only accept transfers to their village
+                $can_approve = ($transfer['to_village_id'] == $user_location['village_id']);
             }
             
             if (!$can_approve) {
@@ -57,17 +60,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Handle approval based on current status and user role
                     if ($transfer['status'] === 'pending_approval') {
                         if ($_SESSION['user_role'] === 'weo') {
-                            // WEO approval
+                            // WEO approval - first step for VEO transfers
                             $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'weo_approved', weo_approved_by = ?, weo_approved_at = NOW() WHERE id = ?");
                             $stmt->execute([$_SESSION['user_id'], $transfer_id]);
-                            $message = 'Transfer approved by WEO. Waiting for receiving ward approval.';
+                            $message = 'Transfer approved by WEO. Waiting for receiving ward WEO approval.';
                         } elseif ($_SESSION['user_role'] === 'admin') {
-                            // Ward admin approval
-                            $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'ward_approved', ward_approved_by = ?, ward_approved_at = NOW() WHERE id = ?");
-                            $stmt->execute([$_SESSION['user_id'], $transfer_id]);
-                            $message = 'Transfer approved by Ward Administrator. Waiting for VEO acceptance.';
+                            // Ward admin approval - for ward admin transfers or after WEO approval
+                            if ($transfer['transfer_type'] === 'ward_admin') {
+                                // Direct ward admin transfer - needs receiving ward WEO approval
+                                $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'weo_approved', weo_approved_by = ?, weo_approved_at = NOW() WHERE id = ?");
+                                $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                                $message = 'Transfer approved by Ward Administrator. Waiting for receiving ward WEO approval.';
+                            } else {
+                                // VEO transfer after WEO approval - needs receiving ward WEO approval
+                                $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'weo_approved', weo_approved_by = ?, weo_approved_at = NOW() WHERE id = ?");
+                                $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                                $message = 'Transfer approved by Ward Administrator. Waiting for receiving ward WEO approval.';
+                            }
                         } elseif ($_SESSION['user_role'] === 'veo') {
-                            // VEO acceptance
+                            // VEO acceptance - final step
                             $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'veo_accepted', veo_accepted_by = ?, veo_accepted_at = NOW() WHERE id = ?");
                             $stmt->execute([$_SESSION['user_id'], $transfer_id]);
                             
@@ -79,12 +90,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $stmt->execute([$transfer_id]);
                             
                             $message = 'Transfer accepted and completed successfully.';
+                        } elseif (isSuperAdmin()) {
+                            // Super admin can approve any transfer at any stage
+                            if ($transfer['status'] === 'pending_approval') {
+                                $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'weo_approved', weo_approved_by = ?, weo_approved_at = NOW() WHERE id = ?");
+                                $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                                $message = 'Transfer approved by Super Administrator. Waiting for receiving ward WEO approval.';
+                            } elseif ($transfer['status'] === 'weo_approved') {
+                                $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'veo_accepted', veo_accepted_by = ?, veo_accepted_at = NOW() WHERE id = ?");
+                                $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                                
+                                // Complete the transfer
+                                $stmt = $pdo->prepare("UPDATE residences SET ward_id = ?, village_id = ? WHERE id = ?");
+                                $stmt->execute([$transfer['to_ward_id'], $transfer['to_village_id'], $transfer['residence_id']]);
+                                
+                                $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'completed' WHERE id = ?");
+                                $stmt->execute([$transfer_id]);
+                                
+                                $message = 'Transfer completed by Super Administrator.';
+                            }
                         }
-                    } elseif ($transfer['status'] === 'weo_approved' && $_SESSION['user_role'] === 'admin') {
-                        // Ward admin approval after WEO approval
-                        $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'ward_approved', ward_approved_by = ?, ward_approved_at = NOW() WHERE id = ?");
-                        $stmt->execute([$_SESSION['user_id'], $transfer_id]);
-                        $message = 'Transfer approved by Ward Administrator. Waiting for VEO acceptance.';
+                    } elseif ($transfer['status'] === 'weo_approved') {
+                        if ($_SESSION['user_role'] === 'weo') {
+                            // Receiving ward WEO approval
+                            $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'ward_approved', ward_approved_by = ?, ward_approved_at = NOW() WHERE id = ?");
+                            $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                            $message = 'Transfer approved by receiving ward WEO. Waiting for VEO acceptance.';
+                        } elseif (isSuperAdmin()) {
+                            // Super admin can approve any stage
+                            $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'veo_accepted', veo_accepted_by = ?, veo_accepted_at = NOW() WHERE id = ?");
+                            $stmt->execute([$_SESSION['user_id'], $transfer_id]);
+                            
+                            // Complete the transfer
+                            $stmt = $pdo->prepare("UPDATE residences SET ward_id = ?, village_id = ? WHERE id = ?");
+                            $stmt->execute([$transfer['to_ward_id'], $transfer['to_village_id'], $transfer['residence_id']]);
+                            
+                            $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'completed' WHERE id = ?");
+                            $stmt->execute([$transfer_id]);
+                            
+                            $message = 'Transfer completed by Super Administrator.';
+                        }
                     } elseif ($transfer['status'] === 'ward_approved' && $_SESSION['user_role'] === 'veo') {
                         // VEO acceptance after ward approval
                         $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'veo_accepted', veo_accepted_by = ?, veo_accepted_at = NOW() WHERE id = ?");
@@ -152,7 +197,7 @@ try {
     } else {
         // Location-based filtering
         if ($_SESSION['user_role'] === 'weo') {
-            // WEO can see transfers from their ward
+            // WEO can see transfers from their ward OR to their ward
             $stmt = $pdo->prepare("
                 SELECT rt.*, r.house_no, r.resident_name, 
                        fw.ward_name as from_ward_name, fv.village_name as from_village_name,
@@ -165,12 +210,12 @@ try {
                 LEFT JOIN wards tw ON rt.to_ward_id = tw.id
                 LEFT JOIN villages tv ON rt.to_village_id = tv.id
                 LEFT JOIN users u ON rt.requested_by = u.id
-                WHERE rt.from_ward_id = ?
+                WHERE (rt.from_ward_id = ? OR rt.to_ward_id = ?)
                 ORDER BY rt.created_at DESC
             ");
-            $stmt->execute([$user_location['ward_id']]);
+            $stmt->execute([$user_location['ward_id'], $user_location['ward_id']]);
         } elseif ($_SESSION['user_role'] === 'admin') {
-            // Ward admin can see transfers to their ward
+            // Ward admin can see transfers to their ward (after WEO approval)
             $stmt = $pdo->prepare("
                 SELECT rt.*, r.house_no, r.resident_name, 
                        fw.ward_name as from_ward_name, fv.village_name as from_village_name,
@@ -184,11 +229,12 @@ try {
                 LEFT JOIN villages tv ON rt.to_village_id = tv.id
                 LEFT JOIN users u ON rt.requested_by = u.id
                 WHERE rt.to_ward_id = ?
+                AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected')
                 ORDER BY rt.created_at DESC
             ");
             $stmt->execute([$user_location['ward_id']]);
         } elseif ($_SESSION['user_role'] === 'veo') {
-            // VEO can see transfers to their village, but only after WEO approval (for VEO transfers) or ward approval (for ward admin transfers)
+            // VEO can see transfers to their village, but only after ward approval
             $stmt = $pdo->prepare("
                 SELECT rt.*, r.house_no, r.resident_name, 
                        fw.ward_name as from_ward_name, fv.village_name as from_village_name,
@@ -202,13 +248,7 @@ try {
                 LEFT JOIN villages tv ON rt.to_village_id = tv.id
                 LEFT JOIN users u ON rt.requested_by = u.id
                 WHERE rt.to_village_id = ?
-                AND (
-                    (rt.transfer_type = 'veo' AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected'))
-                    OR 
-                    (rt.transfer_type = 'ward_admin' AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected'))
-                    OR
-                    (rt.transfer_type = 'super_admin' AND rt.status IN ('completed', 'rejected'))
-                )
+                AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected')
                 ORDER BY rt.created_at DESC
             ");
             $stmt->execute([$user_location['village_id']]);
@@ -227,7 +267,16 @@ include 'includes/header.php';
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-800">Transfer Approvals</h1>
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Transfer Approvals</h1>
+            <p class="text-gray-600">Manage residence transfer requests and approvals</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <label class="flex items-center">
+                <input type="checkbox" id="showCompleted" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                <span class="ml-2 text-sm text-gray-700">Show completed transfers</span>
+            </label>
+        </div>
     </div>
     
     <!-- Messages -->
@@ -284,20 +333,35 @@ include 'includes/header.php';
                             <?php echo ucfirst(str_replace('_', ' ', $transfer['transfer_type'])); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                <?php 
-                                switch($transfer['status']) {
-                                    case 'pending_approval': echo 'bg-yellow-100 text-yellow-800'; break;
-                                    case 'weo_approved': echo 'bg-blue-100 text-blue-800'; break;
-                                    case 'ward_approved': echo 'bg-purple-100 text-purple-800'; break;
-                                    case 'veo_accepted': echo 'bg-green-100 text-green-800'; break;
-                                    case 'completed': echo 'bg-green-100 text-green-800'; break;
-                                    case 'rejected': echo 'bg-red-100 text-red-800'; break;
-                                    default: echo 'bg-gray-100 text-gray-800';
-                                }
-                                ?>">
-                                <?php echo ucfirst(str_replace('_', ' ', $transfer['status'])); ?>
-                            </span>
+                            <div class="flex flex-col">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    <?php 
+                                    switch($transfer['status']) {
+                                        case 'pending_approval': echo 'bg-yellow-100 text-yellow-800'; break;
+                                        case 'weo_approved': echo 'bg-blue-100 text-blue-800'; break;
+                                        case 'ward_approved': echo 'bg-purple-100 text-purple-800'; break;
+                                        case 'veo_accepted': echo 'bg-green-100 text-green-800'; break;
+                                        case 'completed': echo 'bg-green-100 text-green-800'; break;
+                                        case 'rejected': echo 'bg-red-100 text-red-800'; break;
+                                        default: echo 'bg-gray-100 text-gray-800';
+                                    }
+                                    ?>">
+                                    <?php echo ucfirst(str_replace('_', ' ', $transfer['status'])); ?>
+                                </span>
+                                <?php if ($transfer['status'] === 'completed'): ?>
+                                    <span class="text-xs text-green-600 mt-1">
+                                        <i class="fas fa-check-circle mr-1"></i>Transfer Successful
+                                    </span>
+                                <?php elseif ($transfer['status'] === 'rejected'): ?>
+                                    <span class="text-xs text-red-600 mt-1">
+                                        <i class="fas fa-times-circle mr-1"></i>Transfer Rejected
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-xs text-gray-500 mt-1">
+                                        <i class="fas fa-clock mr-1"></i>Pending Action
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo htmlspecialchars($transfer['requested_by_name'] ?? 'Unknown'); ?>
@@ -306,25 +370,38 @@ include 'includes/header.php';
                             <?php echo date('M j, Y', strtotime($transfer['created_at'])); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div class="flex space-x-2">
-                                <?php if ($transfer['status'] !== 'completed' && $transfer['status'] !== 'rejected'): ?>
+                            <div class="flex items-center space-x-2">
+                                <?php if ($transfer['status'] === 'completed'): ?>
+                                    <div class="flex items-center text-green-600">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        <span class="text-xs font-medium">Completed</span>
+                                    </div>
+                                <?php elseif ($transfer['status'] === 'rejected'): ?>
+                                    <div class="flex items-center text-red-600">
+                                        <i class="fas fa-times-circle mr-1"></i>
+                                        <span class="text-xs font-medium">Rejected</span>
+                                    </div>
+                                <?php else: ?>
+                                    <!-- Show action buttons for pending transfers -->
                                     <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'approve')" 
-                                            class="text-green-600 hover:text-green-900" title="Approve">
+                                            class="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50" title="Approve">
                                         <i class="fas fa-check"></i>
                                     </button>
                                     <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'reject')" 
-                                            class="text-red-600 hover:text-red-900" title="Reject">
+                                            class="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50" title="Reject">
                                         <i class="fas fa-times"></i>
                                     </button>
                                     <?php if (isSuperAdmin() || $_SESSION['user_role'] === 'admin'): ?>
                                     <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'cancel')" 
-                                            class="text-orange-600 hover:text-orange-900" title="Cancel Transfer">
+                                            class="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50" title="Cancel Transfer">
                                         <i class="fas fa-ban"></i>
                                     </button>
                                     <?php endif; ?>
                                 <?php endif; ?>
+                                
+                                <!-- View Details button - always available -->
                                 <button onclick="viewTransferDetails(<?php echo $transfer['id']; ?>)" 
-                                        class="text-blue-600 hover:text-blue-900" title="View Details">
+                                        class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
@@ -418,8 +495,7 @@ function closeApprovalModal() {
 }
 
 function viewTransferDetails(transferId) {
-    // This would open a detailed view of the transfer
-    alert('Transfer details view - ID: ' + transferId);
+    window.location.href = 'transfer_details.php?id=' + transferId;
 }
 
 // Close modal when clicking outside
@@ -427,6 +503,26 @@ document.getElementById('approvalModal').addEventListener('click', function(e) {
     if (e.target === this) {
         closeApprovalModal();
     }
+});
+
+// Filter completed transfers
+document.getElementById('showCompleted').addEventListener('change', function() {
+    const showCompleted = this.checked;
+    const rows = document.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const statusCell = row.querySelector('td:nth-child(5)'); // Status column
+        if (statusCell) {
+            const statusText = statusCell.textContent.toLowerCase();
+            const isCompleted = statusText.includes('completed') || statusText.includes('rejected');
+            
+            if (isCompleted && !showCompleted) {
+                row.style.display = 'none';
+            } else {
+                row.style.display = '';
+            }
+        }
+    });
 });
 </script>
 

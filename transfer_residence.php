@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         // Check if residence already has an active transfer
         $stmt = $pdo->prepare("
-            SELECT id, status, transfer_type, 
+            SELECT rt.id, rt.status, rt.transfer_type, 
                    tw.ward_name as to_ward_name, tv.village_name as to_village_name
             FROM residence_transfers rt
             LEFT JOIN wards tw ON rt.to_ward_id = tw.id
