@@ -42,11 +42,17 @@ try {
         // Super admin can see all residences
         $stmt = $pdo->query("
             SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
-                   u.full_name as registered_by_name
+                   u.full_name as registered_by_name,
+                   rt.status as transfer_status, rt.id as transfer_id,
+                   tw.ward_name as transfer_to_ward, tv.village_name as transfer_to_village
             FROM residences r
             LEFT JOIN wards w ON r.ward_id = w.id
             LEFT JOIN villages v ON r.village_id = v.id
             LEFT JOIN users u ON r.registered_by = u.id
+            LEFT JOIN residence_transfers rt ON r.id = rt.residence_id 
+                AND rt.status IN ('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted')
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
             ORDER BY r.registered_at DESC
         ");
     } else {
@@ -58,11 +64,17 @@ try {
             if (!empty($user_location['village_id'])) {
                 $stmt = $pdo->prepare("
                     SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
-                           u.full_name as registered_by_name
+                           u.full_name as registered_by_name,
+                           rt.status as transfer_status, rt.id as transfer_id,
+                           tw.ward_name as transfer_to_ward, tv.village_name as transfer_to_village
                     FROM residences r
                     LEFT JOIN wards w ON r.ward_id = w.id
                     LEFT JOIN villages v ON r.village_id = v.id
                     LEFT JOIN users u ON r.registered_by = u.id
+                    LEFT JOIN residence_transfers rt ON r.id = rt.residence_id 
+                        AND rt.status IN ('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted')
+                    LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+                    LEFT JOIN villages tv ON rt.to_village_id = tv.id
                     WHERE r.village_id = ?
                     ORDER BY r.registered_at DESC
                 ");
@@ -75,11 +87,17 @@ try {
             if (!empty($user_location['ward_id'])) {
                 $stmt = $pdo->prepare("
                     SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
-                           u.full_name as registered_by_name
+                           u.full_name as registered_by_name,
+                           rt.status as transfer_status, rt.id as transfer_id,
+                           tw.ward_name as transfer_to_ward, tv.village_name as transfer_to_village
                     FROM residences r
                     LEFT JOIN wards w ON r.ward_id = w.id
                     LEFT JOIN villages v ON r.village_id = v.id
                     LEFT JOIN users u ON r.registered_by = u.id
+                    LEFT JOIN residence_transfers rt ON r.id = rt.residence_id 
+                        AND rt.status IN ('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted')
+                    LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+                    LEFT JOIN villages tv ON rt.to_village_id = tv.id
                     WHERE r.ward_id = ?
                     ORDER BY r.registered_at DESC
                 ");
@@ -142,11 +160,12 @@ include 'includes/header.php';
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ward</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Street/Village</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <?php if (canViewAllData()): ?>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">By</th>
-                        <?php endif; ?>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transfer</th>
+        <?php if (canViewAllData()): ?>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">By</th>
+        <?php endif; ?>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -201,6 +220,31 @@ include 'includes/header.php';
                                 <?php echo ucfirst($residence['status']); ?>
                             </span>
                         </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <?php if ($residence['transfer_status']): ?>
+                                <div class="flex items-center">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                        <?php
+                                        switch($residence['transfer_status']) {
+                                            case 'pending_approval': echo 'bg-yellow-100 text-yellow-800'; break;
+                                            case 'weo_approved': echo 'bg-blue-100 text-blue-800'; break;
+                                            case 'ward_approved': echo 'bg-purple-100 text-purple-800'; break;
+                                            case 'veo_accepted': echo 'bg-green-100 text-green-800'; break;
+                                            default: echo 'bg-gray-100 text-gray-800';
+                                        }
+                                        ?>">
+                                        <?php echo ucfirst(str_replace('_', ' ', $residence['transfer_status'])); ?>
+                                    </span>
+                                    <div class="ml-2 text-xs text-gray-500">
+                                        to <?php echo htmlspecialchars($residence['transfer_to_ward'] . ' - ' . $residence['transfer_to_village']); ?>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <span class="text-gray-400 text-sm">No transfer</span>
+                            <?php endif; ?>
+                        </td>
+                        
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo formatDate($residence['registered_at']); ?>
                         </td>

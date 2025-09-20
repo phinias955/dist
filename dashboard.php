@@ -177,6 +177,58 @@ include 'includes/header.php';
         </div>
     </div>
     
+    <!-- Pending Transfers Notification -->
+    <?php
+    $pending_transfers = [];
+    if ($_SESSION['user_role'] === 'veo') {
+        $pending_transfers = getPendingTransfersForVEO();
+    } elseif ($_SESSION['user_role'] === 'weo') {
+        $pending_transfers = getPendingTransfersForWEO();
+    } elseif ($_SESSION['user_role'] === 'admin') {
+        $pending_transfers = getPendingTransfersForWardAdmin();
+    }
+    ?>
+    <?php if (!empty($pending_transfers)): ?>
+    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-orange-400 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-orange-800">
+                    You have <?php echo count($pending_transfers); ?> pending transfer<?php echo count($pending_transfers) > 1 ? 's' : ''; ?> requiring your attention
+                </h3>
+                <div class="mt-2">
+                    <div class="text-sm text-orange-700">
+                        <p>Please review and take action on the following transfers:</p>
+                        <ul class="mt-2 space-y-1">
+                            <?php foreach (array_slice($pending_transfers, 0, 3) as $transfer): ?>
+                            <li class="flex items-center">
+                                <i class="fas fa-home text-orange-500 mr-2"></i>
+                                <span><?php echo htmlspecialchars($transfer['house_no'] . ' - ' . $transfer['resident_name']); ?></span>
+                                <span class="ml-2 text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                    <?php echo ucfirst(str_replace('_', ' ', $transfer['status'])); ?>
+                                </span>
+                            </li>
+                            <?php endforeach; ?>
+                            <?php if (count($pending_transfers) > 3): ?>
+                            <li class="text-xs text-orange-600">
+                                ... and <?php echo count($pending_transfers) - 3; ?> more
+                            </li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                    <div class="mt-3">
+                        <a href="transfer_approvals.php" class="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition duration-200">
+                            <i class="fas fa-exchange-alt mr-2"></i>Review Transfers
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    
     <!-- Quick Actions -->
     <div class="bg-white p-6 rounded-lg shadow-md">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>

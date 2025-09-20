@@ -108,6 +108,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$_SESSION['user_id'], $reason, $transfer_id]);
                         $message = 'Transfer request rejected.';
                     }
+                } elseif ($action === 'cancel') {
+                    // Handle cancellation (only admin and super admin)
+                    if (!isSuperAdmin() && $_SESSION['user_role'] !== 'admin') {
+                        $error = 'Only administrators can cancel transfer requests';
+                    } else {
+                        if (empty($reason)) {
+                            $error = 'Cancellation reason is required';
+                        } else {
+                            $stmt = $pdo->prepare("UPDATE residence_transfers SET status = 'rejected', rejected_by = ?, rejected_at = NOW(), rejection_reason = ? WHERE id = ?");
+                            $stmt->execute([$_SESSION['user_id'], 'CANCELLED: ' . $reason, $transfer_id]);
+                            $message = 'Transfer request cancelled successfully.';
+                        }
+                    }
                 }
             }
         }
@@ -175,7 +188,7 @@ try {
             ");
             $stmt->execute([$user_location['ward_id']]);
         } elseif ($_SESSION['user_role'] === 'veo') {
-            // VEO can see transfers to their village
+            // VEO can see transfers to their village, but only after WEO approval (for VEO transfers) or ward approval (for ward admin transfers)
             $stmt = $pdo->prepare("
                 SELECT rt.*, r.house_no, r.resident_name, 
                        fw.ward_name as from_ward_name, fv.village_name as from_village_name,
@@ -189,6 +202,13 @@ try {
                 LEFT JOIN villages tv ON rt.to_village_id = tv.id
                 LEFT JOIN users u ON rt.requested_by = u.id
                 WHERE rt.to_village_id = ?
+                AND (
+                    (rt.transfer_type = 'veo' AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected'))
+                    OR 
+                    (rt.transfer_type = 'ward_admin' AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected'))
+                    OR
+                    (rt.transfer_type = 'super_admin' AND rt.status IN ('completed', 'rejected'))
+                )
                 ORDER BY rt.created_at DESC
             ");
             $stmt->execute([$user_location['village_id']]);
@@ -286,27 +306,28 @@ include 'includes/header.php';
                             <?php echo date('M j, Y', strtotime($transfer['created_at'])); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <?php if ($transfer['status'] !== 'completed' && $transfer['status'] !== 'rejected'): ?>
                             <div class="flex space-x-2">
-                                <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'approve')" 
-                                        class="text-green-600 hover:text-green-900" title="Approve">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'reject')" 
-                                        class="text-red-600 hover:text-red-900" title="Reject">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                                <?php if ($transfer['status'] !== 'completed' && $transfer['status'] !== 'rejected'): ?>
+                                    <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'approve')" 
+                                            class="text-green-600 hover:text-green-900" title="Approve">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'reject')" 
+                                            class="text-red-600 hover:text-red-900" title="Reject">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <?php if (isSuperAdmin() || $_SESSION['user_role'] === 'admin'): ?>
+                                    <button onclick="openApprovalModal(<?php echo $transfer['id']; ?>, 'cancel')" 
+                                            class="text-orange-600 hover:text-orange-900" title="Cancel Transfer">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                                 <button onclick="viewTransferDetails(<?php echo $transfer['id']; ?>)" 
                                         class="text-blue-600 hover:text-blue-900" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
-                            <?php else: ?>
-                            <button onclick="viewTransferDetails(<?php echo $transfer['id']; ?>)" 
-                                    class="text-blue-600 hover:text-blue-900" title="View Details">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -372,6 +393,13 @@ function openApprovalModal(transferId, action) {
         reasonField.required = false;
         submitBtn.textContent = 'Approve';
         submitBtn.className = 'bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700';
+    } else if (action === 'cancel') {
+        title.textContent = 'Cancel Transfer';
+        reasonLabel.textContent = 'Cancellation Reason *';
+        reasonField.placeholder = 'Please provide a reason for cancelling this transfer...';
+        reasonField.required = true;
+        submitBtn.textContent = 'Cancel Transfer';
+        submitBtn.className = 'bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700';
     } else {
         title.textContent = 'Reject Transfer';
         reasonLabel.textContent = 'Rejection Reason *';

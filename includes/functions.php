@@ -514,4 +514,121 @@ function getAccessibleResidences() {
         return [];
     }
 }
+
+// Get pending transfers for VEO (transfers waiting for VEO acceptance)
+function getPendingTransfersForVEO() {
+    if ($_SESSION['user_role'] !== 'veo') {
+        return [];
+    }
+
+    $user_location = getUserLocationInfo();
+    if (!$user_location || empty($user_location['village_id'])) {
+        return [];
+    }
+
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT rt.*, r.house_no, r.resident_name,
+                   fw.ward_name as from_ward_name, fv.village_name as from_village_name,
+                   tw.ward_name as to_ward_name, tv.village_name as to_village_name,
+                   u.full_name as requested_by_name
+            FROM residence_transfers rt
+            LEFT JOIN residences r ON rt.residence_id = r.id
+            LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+            LEFT JOIN villages fv ON rt.from_village_id = fv.id
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
+            LEFT JOIN users u ON rt.requested_by = u.id
+            WHERE rt.to_village_id = ?
+            AND (
+                (rt.transfer_type = 'veo' AND rt.status = 'ward_approved')
+                OR 
+                (rt.transfer_type = 'ward_admin' AND rt.status = 'ward_approved')
+            )
+            ORDER BY rt.created_at DESC
+        ");
+        $stmt->execute([$user_location['village_id']]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+// Get pending transfers for WEO (transfers waiting for WEO approval)
+function getPendingTransfersForWEO() {
+    if ($_SESSION['user_role'] !== 'weo') {
+        return [];
+    }
+
+    $user_location = getUserLocationInfo();
+    if (!$user_location || empty($user_location['ward_id'])) {
+        return [];
+    }
+
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT rt.*, r.house_no, r.resident_name,
+                   fw.ward_name as from_ward_name, fv.village_name as from_village_name,
+                   tw.ward_name as to_ward_name, tv.village_name as to_village_name,
+                   u.full_name as requested_by_name
+            FROM residence_transfers rt
+            LEFT JOIN residences r ON rt.residence_id = r.id
+            LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+            LEFT JOIN villages fv ON rt.from_village_id = fv.id
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
+            LEFT JOIN users u ON rt.requested_by = u.id
+            WHERE rt.from_ward_id = ?
+            AND rt.status = 'pending_approval'
+            AND rt.transfer_type = 'veo'
+            ORDER BY rt.created_at DESC
+        ");
+        $stmt->execute([$user_location['ward_id']]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+// Get pending transfers for Ward Admin (transfers waiting for ward approval)
+function getPendingTransfersForWardAdmin() {
+    if ($_SESSION['user_role'] !== 'admin') {
+        return [];
+    }
+
+    $user_location = getUserLocationInfo();
+    if (!$user_location || empty($user_location['ward_id'])) {
+        return [];
+    }
+
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT rt.*, r.house_no, r.resident_name,
+                   fw.ward_name as from_ward_name, fv.village_name as from_village_name,
+                   tw.ward_name as to_ward_name, tv.village_name as to_village_name,
+                   u.full_name as requested_by_name
+            FROM residence_transfers rt
+            LEFT JOIN residences r ON rt.residence_id = r.id
+            LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+            LEFT JOIN villages fv ON rt.from_village_id = fv.id
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
+            LEFT JOIN users u ON rt.requested_by = u.id
+            WHERE rt.to_ward_id = ?
+            AND (
+                (rt.transfer_type = 'veo' AND rt.status = 'weo_approved')
+                OR 
+                (rt.transfer_type = 'ward_admin' AND rt.status = 'pending_approval')
+            )
+            ORDER BY rt.created_at DESC
+        ");
+        $stmt->execute([$user_location['ward_id']]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
 ?>

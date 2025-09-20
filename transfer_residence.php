@@ -30,6 +30,22 @@ try {
     $stmt->execute([$residence_id]);
     $residence = $stmt->fetch();
     
+    // Check for existing active transfer
+    $stmt = $pdo->prepare("
+        SELECT rt.id, rt.status, rt.transfer_type, 
+               tw.ward_name as to_ward_name, tv.village_name as to_village_name,
+               rt.created_at
+        FROM residence_transfers rt
+        LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+        LEFT JOIN villages tv ON rt.to_village_id = tv.id
+        WHERE rt.residence_id = ? 
+        AND rt.status IN ('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted')
+        ORDER BY rt.created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$residence_id]);
+    $existing_transfer = $stmt->fetch();
+    
     if (!$residence) {
         header('Location: residences.php');
         exit();
@@ -74,6 +90,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($transfer_reason)) {
         $error = 'Transfer reason is required';
     } else {
+        // Check if residence already has an active transfer
+        $stmt = $pdo->prepare("
+            SELECT id, status, transfer_type, 
+                   tw.ward_name as to_ward_name, tv.village_name as to_village_name
+            FROM residence_transfers rt
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
+            WHERE rt.residence_id = ? 
+            AND rt.status IN ('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted')
+        ");
+        $stmt->execute([$residence_id]);
+        $existing_transfer = $stmt->fetch();
+        
+        if ($existing_transfer) {
+            $error = 'This residence already has an active transfer request to ' . 
+                    $existing_transfer['to_ward_name'] . ' - ' . $existing_transfer['to_village_name'] . 
+                    '. Only one transfer per residence is allowed at a time.';
+        } else {
         try {
             // Check if the target village exists and is in the selected ward
             $stmt = $pdo->prepare("SELECT id FROM villages WHERE id = ? AND ward_id = ?");
@@ -130,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             $error = 'Database error occurred';
         }
+        }
     }
 }
 
@@ -178,8 +213,39 @@ include 'includes/header.php';
             </div>
         <?php endif; ?>
         
+        <!-- Existing Transfer Warning -->
+        <?php if ($existing_transfer): ?>
+        <div class="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded mb-4">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <div>
+                    <strong>Active Transfer Exists!</strong>
+                    <p class="text-sm mt-1">
+                        This residence already has an active transfer request to 
+                        <strong><?php echo htmlspecialchars($existing_transfer['to_ward_name'] . ' - ' . $existing_transfer['to_village_name']); ?></strong>
+                        (Status: <?php echo ucfirst(str_replace('_', ' ', $existing_transfer['status'])); ?>)
+                    </p>
+                    <p class="text-sm mt-1">
+                        Only one transfer per residence is allowed at a time. 
+                        <a href="transfer_details.php?id=<?php echo $existing_transfer['id']; ?>" class="underline hover:no-underline">
+                            View existing transfer details
+                        </a>
+                    </p>
+                    <?php if (isSuperAdmin() || $_SESSION['user_role'] === 'admin'): ?>
+                    <div class="mt-3">
+                        <button type="button" onclick="showTransferForm()" 
+                                class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition duration-200">
+                            <i class="fas fa-plus mr-2"></i>Create New Transfer (Admin Override)
+                        </button>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <!-- Transfer Form -->
-        <form method="POST" class="space-y-6" id="transferForm">
+        <form method="POST" class="space-y-6" id="transferForm" <?php echo $existing_transfer ? 'style="display: none;"' : ''; ?>>
             <div class="bg-blue-50 p-4 rounded-lg">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">
                     <i class="fas fa-exchange-alt mr-2"></i>Transfer Details
@@ -277,6 +343,12 @@ document.getElementById('new_ward_id').addEventListener('change', function() {
         });
     }
 });
+
+// Show transfer form (admin override)
+function showTransferForm() {
+    document.getElementById('transferForm').style.display = 'block';
+    document.querySelector('.bg-orange-100').style.display = 'none';
+}
 
 // Form validation
 document.getElementById('transferForm').addEventListener('submit', function(e) {

@@ -10,33 +10,135 @@ $page_title = 'Transfer Status';
 $message = '';
 $error = '';
 
-// Get all transfer requests with detailed status information
+// Get transfer requests with detailed status information based on user role
 try {
-    $stmt = $pdo->query("
-        SELECT rt.*, 
-               r.house_no, r.resident_name, r.nida_number,
-               fw.ward_name as from_ward_name, fw.ward_code as from_ward_code,
-               fv.village_name as from_village_name, fv.village_code as from_village_code,
-               tw.ward_name as to_ward_name, tw.ward_code as to_ward_code,
-               tv.village_name as to_village_name, tv.village_code as to_village_code,
-               u.full_name as requested_by_name, u.role as requested_by_role,
-               weo.full_name as weo_approved_by_name,
-               ward_admin.full_name as ward_approved_by_name,
-               veo.full_name as veo_accepted_by_name,
-               rejected_user.full_name as rejected_by_name
-        FROM residence_transfers rt
-        LEFT JOIN residences r ON rt.residence_id = r.id
-        LEFT JOIN wards fw ON rt.from_ward_id = fw.id
-        LEFT JOIN villages fv ON rt.from_village_id = fv.id
-        LEFT JOIN wards tw ON rt.to_ward_id = tw.id
-        LEFT JOIN villages tv ON rt.to_village_id = tv.id
-        LEFT JOIN users u ON rt.requested_by = u.id
-        LEFT JOIN users weo ON rt.weo_approved_by = weo.id
-        LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
-        LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
-        LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
-        ORDER BY rt.created_at DESC
-    ");
+    if (isSuperAdmin()) {
+        // Super admin can see all transfers
+        $stmt = $pdo->query("
+            SELECT rt.*, 
+                   r.house_no, r.resident_name, r.nida_number,
+                   fw.ward_name as from_ward_name, fw.ward_code as from_ward_code,
+                   fv.village_name as from_village_name, fv.village_code as from_village_code,
+                   tw.ward_name as to_ward_name, tw.ward_code as to_ward_code,
+                   tv.village_name as to_village_name, tv.village_code as to_village_code,
+                   u.full_name as requested_by_name, u.role as requested_by_role,
+                   weo.full_name as weo_approved_by_name,
+                   ward_admin.full_name as ward_approved_by_name,
+                   veo.full_name as veo_accepted_by_name,
+                   rejected_user.full_name as rejected_by_name
+            FROM residence_transfers rt
+            LEFT JOIN residences r ON rt.residence_id = r.id
+            LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+            LEFT JOIN villages fv ON rt.from_village_id = fv.id
+            LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+            LEFT JOIN villages tv ON rt.to_village_id = tv.id
+            LEFT JOIN users u ON rt.requested_by = u.id
+            LEFT JOIN users weo ON rt.weo_approved_by = weo.id
+            LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
+            LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
+            LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
+            ORDER BY rt.created_at DESC
+        ");
+    } else {
+        // Role-based filtering
+        $user_location = getUserLocationInfo();
+        
+        if ($_SESSION['user_role'] === 'weo') {
+            // WEO can see transfers from their ward
+            $stmt = $pdo->prepare("
+                SELECT rt.*, 
+                       r.house_no, r.resident_name, r.nida_number,
+                       fw.ward_name as from_ward_name, fw.ward_code as from_ward_code,
+                       fv.village_name as from_village_name, fv.village_code as from_village_code,
+                       tw.ward_name as to_ward_name, tw.ward_code as to_ward_code,
+                       tv.village_name as to_village_name, tv.village_code as to_village_code,
+                       u.full_name as requested_by_name, u.role as requested_by_role,
+                       weo.full_name as weo_approved_by_name,
+                       ward_admin.full_name as ward_approved_by_name,
+                       veo.full_name as veo_accepted_by_name,
+                       rejected_user.full_name as rejected_by_name
+                FROM residence_transfers rt
+                LEFT JOIN residences r ON rt.residence_id = r.id
+                LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+                LEFT JOIN villages fv ON rt.from_village_id = fv.id
+                LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+                LEFT JOIN villages tv ON rt.to_village_id = tv.id
+                LEFT JOIN users u ON rt.requested_by = u.id
+                LEFT JOIN users weo ON rt.weo_approved_by = weo.id
+                LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
+                LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
+                LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
+                WHERE rt.from_ward_id = ?
+                ORDER BY rt.created_at DESC
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+        } elseif ($_SESSION['user_role'] === 'admin') {
+            // Ward admin can see transfers to their ward
+            $stmt = $pdo->prepare("
+                SELECT rt.*, 
+                       r.house_no, r.resident_name, r.nida_number,
+                       fw.ward_name as from_ward_name, fw.ward_code as from_ward_code,
+                       fv.village_name as from_village_name, fv.village_code as from_village_code,
+                       tw.ward_name as to_ward_name, tw.ward_code as to_ward_code,
+                       tv.village_name as to_village_name, tv.village_code as to_village_code,
+                       u.full_name as requested_by_name, u.role as requested_by_role,
+                       weo.full_name as weo_approved_by_name,
+                       ward_admin.full_name as ward_approved_by_name,
+                       veo.full_name as veo_accepted_by_name,
+                       rejected_user.full_name as rejected_by_name
+                FROM residence_transfers rt
+                LEFT JOIN residences r ON rt.residence_id = r.id
+                LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+                LEFT JOIN villages fv ON rt.from_village_id = fv.id
+                LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+                LEFT JOIN villages tv ON rt.to_village_id = tv.id
+                LEFT JOIN users u ON rt.requested_by = u.id
+                LEFT JOIN users weo ON rt.weo_approved_by = weo.id
+                LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
+                LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
+                LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
+                WHERE rt.to_ward_id = ?
+                ORDER BY rt.created_at DESC
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+        } elseif ($_SESSION['user_role'] === 'veo') {
+            // VEO can see transfers to their village, but only after WEO approval (for VEO transfers) or ward approval (for ward admin transfers)
+            $stmt = $pdo->prepare("
+                SELECT rt.*, 
+                       r.house_no, r.resident_name, r.nida_number,
+                       fw.ward_name as from_ward_name, fw.ward_code as from_ward_code,
+                       fv.village_name as from_village_name, fv.village_code as from_village_code,
+                       tw.ward_name as to_ward_name, tw.ward_code as to_ward_code,
+                       tv.village_name as to_village_name, tv.village_code as to_village_code,
+                       u.full_name as requested_by_name, u.role as requested_by_role,
+                       weo.full_name as weo_approved_by_name,
+                       ward_admin.full_name as ward_approved_by_name,
+                       veo.full_name as veo_accepted_by_name,
+                       rejected_user.full_name as rejected_by_name
+                FROM residence_transfers rt
+                LEFT JOIN residences r ON rt.residence_id = r.id
+                LEFT JOIN wards fw ON rt.from_ward_id = fw.id
+                LEFT JOIN villages fv ON rt.from_village_id = fv.id
+                LEFT JOIN wards tw ON rt.to_ward_id = tw.id
+                LEFT JOIN villages tv ON rt.to_village_id = tv.id
+                LEFT JOIN users u ON rt.requested_by = u.id
+                LEFT JOIN users weo ON rt.weo_approved_by = weo.id
+                LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
+                LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
+                LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
+                WHERE rt.to_village_id = ?
+                AND (
+                    (rt.transfer_type = 'veo' AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected'))
+                    OR 
+                    (rt.transfer_type = 'ward_admin' AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected'))
+                    OR
+                    (rt.transfer_type = 'super_admin' AND rt.status IN ('completed', 'rejected'))
+                )
+                ORDER BY rt.created_at DESC
+            ");
+            $stmt->execute([$user_location['village_id']]);
+        }
+    }
     
     $transfers = $stmt->fetchAll();
 } catch (PDOException $e) {
