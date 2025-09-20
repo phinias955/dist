@@ -3,7 +3,11 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
-requirePermission('manage_users');
+// Check if user has permission to manage users
+if (!canAccessPage('users')) {
+    header('Location: unauthorized.php');
+    exit();
+}
 
 $page_title = 'Edit User';
 

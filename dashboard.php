@@ -7,35 +7,115 @@ requireLogin();
 
 $page_title = 'Dashboard';
 
-// Get statistics based on user role
+// Get statistics based on user role and location
 $stats = [];
 
 try {
-    if (canViewAllData()) {
-        // Get total users
+    if (isSuperAdmin()) {
+        // Super Admin - all data
         $stmt = $pdo->query("SELECT COUNT(*) as total FROM users WHERE is_active = 1");
         $stats['total_users'] = $stmt->fetch()['total'];
         
-        // Get total residences
         $stmt = $pdo->query("SELECT COUNT(*) as total FROM residences WHERE status = 'active'");
         $stats['total_residences'] = $stmt->fetch()['total'];
         
-        // Get recent registrations
         $stmt = $pdo->query("SELECT COUNT(*) as total FROM residences WHERE registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
         $stats['recent_registrations'] = $stmt->fetch()['total'];
         
-        // Get users by role
         $stmt = $pdo->query("SELECT role, COUNT(*) as count FROM users WHERE is_active = 1 GROUP BY role");
         $stats['users_by_role'] = $stmt->fetchAll();
     } else {
-        // For WEO and VEO, only show their own data
-        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM residences WHERE registered_by = ? AND status = 'active'");
-        $stmt->execute([$_SESSION['user_id']]);
-        $stats['total_residences'] = $stmt->fetch()['total'];
+        // Location-based statistics
+        $user_location = getUserLocationInfo();
         
-        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM residences WHERE registered_by = ? AND registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-        $stmt->execute([$_SESSION['user_id']]);
-        $stats['recent_registrations'] = $stmt->fetch()['total'];
+        if ($_SESSION['user_role'] === 'admin') {
+            // Ward Admin - all residences in their ward
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences r 
+                LEFT JOIN villages v ON r.village_id = v.id 
+                WHERE r.status = 'active' AND v.ward_id = ?
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['total_residences'] = $stmt->fetch()['total'];
+            
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences r 
+                LEFT JOIN villages v ON r.village_id = v.id 
+                WHERE r.registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND v.ward_id = ?
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['recent_registrations'] = $stmt->fetch()['total'];
+            
+        } elseif ($_SESSION['user_role'] === 'weo') {
+            // WEO - all residences in all villages under their ward
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences r 
+                LEFT JOIN villages v ON r.village_id = v.id 
+                WHERE r.status = 'active' AND v.ward_id = ?
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['total_residences'] = $stmt->fetch()['total'];
+            
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences r 
+                LEFT JOIN villages v ON r.village_id = v.id 
+                WHERE r.registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND v.ward_id = ?
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['recent_registrations'] = $stmt->fetch()['total'];
+            
+        } elseif ($_SESSION['user_role'] === 'veo') {
+            // VEO - only residences in their specific village
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences 
+                WHERE status = 'active' AND village_id = ?
+            ");
+            $stmt->execute([$user_location['village_id']]);
+            $stats['total_residences'] = $stmt->fetch()['total'];
+            
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total 
+                FROM residences 
+                WHERE registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND village_id = ?
+            ");
+            $stmt->execute([$user_location['village_id']]);
+            $stats['recent_registrations'] = $stmt->fetch()['total'];
+        }
+        
+        // Get users by role for location-based users
+        if ($_SESSION['user_role'] === 'admin') {
+            $stmt = $pdo->prepare("
+                SELECT role, COUNT(*) as count 
+                FROM users 
+                WHERE is_active = 1 AND assigned_ward_id = ?
+                GROUP BY role
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['users_by_role'] = $stmt->fetchAll();
+        } elseif ($_SESSION['user_role'] === 'weo') {
+            $stmt = $pdo->prepare("
+                SELECT role, COUNT(*) as count 
+                FROM users 
+                WHERE is_active = 1 AND assigned_ward_id = ?
+                GROUP BY role
+            ");
+            $stmt->execute([$user_location['ward_id']]);
+            $stats['users_by_role'] = $stmt->fetchAll();
+        } elseif ($_SESSION['user_role'] === 'veo') {
+            $stmt = $pdo->prepare("
+                SELECT role, COUNT(*) as count 
+                FROM users 
+                WHERE is_active = 1 AND assigned_village_id = ?
+                GROUP BY role
+            ");
+            $stmt->execute([$user_location['village_id']]);
+            $stats['users_by_role'] = $stmt->fetchAll();
+        }
     }
     
     // Get recent residences based on user location access
@@ -146,8 +226,29 @@ include 'includes/header.php';
                     <i class="fas fa-building text-xl"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Total Residences</p>
+                    <p class="text-sm font-medium text-gray-600">
+                        <?php 
+                        if (isSuperAdmin()) {
+                            echo 'Total Residences (All)';
+                        } elseif ($_SESSION['user_role'] === 'admin' || $_SESSION['user_role'] === 'weo') {
+                            echo 'Total Residences (Ward)';
+                        } elseif ($_SESSION['user_role'] === 'veo') {
+                            echo 'Total Residences (Village)';
+                        }
+                        ?>
+                    </p>
                     <p class="text-2xl font-bold text-gray-900"><?php echo $stats['total_residences'] ?? 0; ?></p>
+                    <?php if (!isSuperAdmin() && isset($user_location)): ?>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <?php 
+                        if ($_SESSION['user_role'] === 'veo') {
+                            echo 'In ' . htmlspecialchars($user_location['village_name']);
+                        } elseif ($_SESSION['user_role'] === 'admin' || $_SESSION['user_role'] === 'weo') {
+                            echo 'In ' . htmlspecialchars($user_location['ward_name']);
+                        }
+                        ?>
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -158,8 +259,29 @@ include 'includes/header.php';
                     <i class="fas fa-chart-line text-xl"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">This Week</p>
+                    <p class="text-sm font-medium text-gray-600">
+                        <?php 
+                        if (isSuperAdmin()) {
+                            echo 'New This Week (All)';
+                        } elseif ($_SESSION['user_role'] === 'admin' || $_SESSION['user_role'] === 'weo') {
+                            echo 'New This Week (Ward)';
+                        } elseif ($_SESSION['user_role'] === 'veo') {
+                            echo 'New This Week (Village)';
+                        }
+                        ?>
+                    </p>
                     <p class="text-2xl font-bold text-gray-900"><?php echo $stats['recent_registrations'] ?? 0; ?></p>
+                    <?php if (!isSuperAdmin() && isset($user_location)): ?>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <?php 
+                        if ($_SESSION['user_role'] === 'veo') {
+                            echo 'In ' . htmlspecialchars($user_location['village_name']);
+                        } elseif ($_SESSION['user_role'] === 'admin' || $_SESSION['user_role'] === 'weo') {
+                            echo 'In ' . htmlspecialchars($user_location['ward_name']);
+                        }
+                        ?>
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -176,6 +298,46 @@ include 'includes/header.php';
             </div>
         </div>
     </div>
+    
+    <!-- Village Breakdown for WEO and Ward Admin -->
+    <?php if (($_SESSION['user_role'] === 'weo' || $_SESSION['user_role'] === 'admin') && !isSuperAdmin()): ?>
+    <?php
+    // Get village breakdown for the ward
+    $stmt = $pdo->prepare("
+        SELECT v.village_name, v.village_code, COUNT(r.id) as residence_count
+        FROM villages v
+        LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+        WHERE v.ward_id = ?
+        GROUP BY v.id, v.village_name, v.village_code
+        ORDER BY v.village_name
+    ");
+    $stmt->execute([$user_location['ward_id']]);
+    $village_breakdown = $stmt->fetchAll();
+    ?>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+            <i class="fas fa-chart-pie mr-2"></i>Residences by Village
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <?php foreach ($village_breakdown as $village): ?>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600"><?php echo htmlspecialchars($village['village_name']); ?></p>
+                        <?php if (!empty($village['village_code'])): ?>
+                        <p class="text-xs text-gray-500"><?php echo htmlspecialchars($village['village_code']); ?></p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-bold text-gray-900"><?php echo $village['residence_count']; ?></p>
+                        <p class="text-xs text-gray-500">residences</p>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
     
     <!-- Pending Transfers Notification -->
     <?php

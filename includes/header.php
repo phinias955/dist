@@ -63,7 +63,7 @@ if (!isset($page_title)) {
                         </a>
                     </li>
                     
-                    <?php if (canManageUsers()): ?>
+                    <?php if (canAccessPage('users')): ?>
                     <li>
                         <a href="users.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-users mr-3"></i>
@@ -72,14 +72,16 @@ if (!isset($page_title)) {
                     </li>
                     <?php endif; ?>
                     
-                    <?php if (canManageResidences()): ?>
+                    <?php if (canAccessPage('residences')): ?>
                     <li>
                         <a href="residences.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'residences.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-building mr-3"></i>
                             Residences
                         </a>
                     </li>
+                    <?php endif; ?>
                     
+                    <?php if (canAccessPage('add_residence')): ?>
                     <li>
                         <a href="add_residence.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'add_residence.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-plus-circle mr-3"></i>
@@ -88,7 +90,7 @@ if (!isset($page_title)) {
                     </li>
                     <?php endif; ?>
                     
-                    <?php if (canViewReports()): ?>
+                    <?php if (canAccessPage('reports')): ?>
                     <li>
                         <a href="reports.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-chart-bar mr-3"></i>
@@ -97,51 +99,76 @@ if (!isset($page_title)) {
                     </li>
                     <?php endif; ?>
                     
+                    <?php if (canAccessPage('transfer_approvals')): ?>
                     <li>
                         <a href="transfer_approvals.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'transfer_approvals.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-exchange-alt mr-3"></i>
                             Transfer Approvals
                         </a>
                     </li>
+                    <?php endif; ?>
                     
+                    <?php if (canAccessPage('transfer_status')): ?>
                     <li>
                         <a href="transfer_status.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'transfer_status.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-chart-line mr-3"></i>
                             Transfer Status
                         </a>
                     </li>
+                    <?php endif; ?>
                     
-                    <?php if (canManagePermissions()): ?>
+                    <?php if (canAccessPage('transferred_out')): ?>
                     <li>
-                        <a href="permissions.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'permissions.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
-                            <i class="fas fa-shield-alt mr-3"></i>
-                            Manage Permissions
+                        <a href="transferred_out.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'transferred_out.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                            <i class="fas fa-arrow-right mr-3"></i>
+                            Transferred Out
                         </a>
                     </li>
                     <?php endif; ?>
                     
-                    <?php if (isSuperAdmin()): ?>
+                    <?php if (canAccessPage('permissions')): ?>
+                    <li>
+                        <a href="permissions.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'permissions.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                            <i class="fas fa-shield-alt mr-3"></i>
+                            Role Permissions
+                        </a>
+                    </li>
+                    <li>
+                        <a href="user_permissions.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'user_permissions.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                            <i class="fas fa-user-shield mr-3"></i>
+                            User Permissions
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                    
+                    <?php if (canAccessPage('system_settings') || canAccessPage('ward_management') || canAccessPage('village_management')): ?>
                     <li class="pt-4 border-t">
                         <span class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">System Management</span>
                     </li>
+                    <?php if (canAccessPage('system_settings')): ?>
                     <li>
                         <a href="system_settings.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'system_settings.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-cog mr-3"></i>
                             System Settings
                         </a>
                     </li>
+                    <?php endif; ?>
+                    <?php if (canAccessPage('ward_management')): ?>
                     <li>
                         <a href="ward_management.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'ward_management.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-building mr-3"></i>
                             Ward Management
                         </a>
                     </li>
+                    <?php endif; ?>
+                    <?php if (canAccessPage('village_management')): ?>
                     <li>
                         <a href="village_management.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'village_management.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-home mr-3"></i>
                             Street/Village Management
                         </a>
                     </li>
+                    <?php endif; ?>
                     <?php endif; ?>
                     
                     <li class="pt-4 border-t">

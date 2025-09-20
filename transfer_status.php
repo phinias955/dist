@@ -44,7 +44,7 @@ try {
         $user_location = getUserLocationInfo();
         
         if ($_SESSION['user_role'] === 'weo') {
-            // WEO can see transfers from their ward
+            // WEO can see transfers from their ward OR to their ward
             $stmt = $pdo->prepare("
                 SELECT rt.*, 
                        r.house_no, r.resident_name, r.nida_number,
@@ -68,12 +68,12 @@ try {
                 LEFT JOIN users ward_admin ON rt.ward_approved_by = ward_admin.id
                 LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
                 LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
-                WHERE rt.from_ward_id = ?
+                WHERE (rt.from_ward_id = ? OR rt.to_ward_id = ?)
                 ORDER BY rt.created_at DESC
             ");
-            $stmt->execute([$user_location['ward_id']]);
+            $stmt->execute([$user_location['ward_id'], $user_location['ward_id']]);
         } elseif ($_SESSION['user_role'] === 'admin') {
-            // Ward admin can see transfers to their ward
+            // Ward admin can see transfers to their ward (after WEO approval)
             $stmt = $pdo->prepare("
                 SELECT rt.*, 
                        r.house_no, r.resident_name, r.nida_number,
@@ -98,11 +98,12 @@ try {
                 LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
                 LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
                 WHERE rt.to_ward_id = ?
+                AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected')
                 ORDER BY rt.created_at DESC
             ");
             $stmt->execute([$user_location['ward_id']]);
         } elseif ($_SESSION['user_role'] === 'veo') {
-            // VEO can see transfers to their village, but only after WEO approval (for VEO transfers) or ward approval (for ward admin transfers)
+            // VEO can see transfers to their village, but only after ward approval
             $stmt = $pdo->prepare("
                 SELECT rt.*, 
                        r.house_no, r.resident_name, r.nida_number,
@@ -127,13 +128,7 @@ try {
                 LEFT JOIN users veo ON rt.veo_accepted_by = veo.id
                 LEFT JOIN users rejected_user ON rt.rejected_by = rejected_user.id
                 WHERE rt.to_village_id = ?
-                AND (
-                    (rt.transfer_type = 'veo' AND rt.status IN ('weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected'))
-                    OR 
-                    (rt.transfer_type = 'ward_admin' AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected'))
-                    OR
-                    (rt.transfer_type = 'super_admin' AND rt.status IN ('completed', 'rejected'))
-                )
+                AND rt.status IN ('ward_approved', 'veo_accepted', 'completed', 'rejected')
                 ORDER BY rt.created_at DESC
             ");
             $stmt->execute([$user_location['village_id']]);

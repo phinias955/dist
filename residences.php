@@ -10,8 +10,8 @@ $page_title = 'Residences';
 $message = '';
 $error = '';
 
-// Handle residence deletion
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+// Handle residence deletion (WEO cannot delete)
+if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $_SESSION['user_role'] !== 'weo') {
     $residence_id = (int)$_GET['delete'];
     
     try {
@@ -23,8 +23,8 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 }
 
-// Handle residence activation
-if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
+// Handle residence activation (WEO cannot activate)
+if (isset($_GET['activate']) && is_numeric($_GET['activate']) && $_SESSION['user_role'] !== 'weo') {
     $residence_id = (int)$_GET['activate'];
     
     try {
@@ -127,10 +127,23 @@ include 'includes/header.php';
     <!-- Header -->
     <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold text-gray-800">Residences</h1>
+        <?php if ($_SESSION['user_role'] !== 'weo'): ?>
         <a href="add_residence.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
             <i class="fas fa-plus mr-2"></i>Add New Residence
         </a>
+        <?php endif; ?>
     </div>
+    
+    <!-- WEO Read-only Notice -->
+    <?php if ($_SESSION['user_role'] === 'weo'): ?>
+    <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle mr-2"></i>
+            <span class="text-sm font-medium">Read-only Access:</span>
+            <span class="text-sm ml-2">You can view residence information but cannot add, edit, delete, or manage family members.</span>
+        </div>
+    </div>
+    <?php endif; ?>
     
     <!-- Messages -->
     <?php if ($message): ?>
@@ -160,6 +173,7 @@ include 'includes/header.php';
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ward</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Street/Village</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Family Members</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transfer</th>
         <?php if (canViewAllData()): ?>
@@ -206,6 +220,27 @@ include 'includes/header.php';
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo htmlspecialchars($residence['village_name'] ?? 'N/A'); ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php
+                            // Get family members count for this residence
+                            try {
+                                $family_stmt = $pdo->prepare("SELECT COUNT(*) as count FROM family_members WHERE residence_id = ?");
+                                $family_stmt->execute([$residence['id']]);
+                                $family_count = $family_stmt->fetch()['count'];
+                                
+                                if ($family_count > 0) {
+                                    echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">';
+                                    echo '<i class="fas fa-users mr-1"></i>';
+                                    echo $family_count . ' member' . ($family_count > 1 ? 's' : '');
+                                    echo '</span>';
+                                } else {
+                                    echo '<span class="text-gray-400 text-xs">No family members</span>';
+                                }
+                            } catch (PDOException $e) {
+                                echo '<span class="text-gray-400 text-xs">N/A</span>';
+                            }
+                            ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -259,18 +294,21 @@ include 'includes/header.php';
                                    class="text-blue-600 hover:text-blue-900" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                                
+                                <?php if ($_SESSION['user_role'] !== 'weo'): ?>
+                                <!-- WEO cannot edit, manage family members, transfer, or delete -->
                                 <a href="edit_residence.php?id=<?php echo $residence['id']; ?>" 
                                    class="text-green-600 hover:text-green-900" title="Edit Residence">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                <a href="family_members.php?id=<?php echo $residence['id']; ?>"
-                   class="text-purple-600 hover:text-purple-900" title="Manage Family Members">
-                    <i class="fas fa-users"></i>
-                </a>
-                <a href="transfer_residence.php?id=<?php echo $residence['id']; ?>"
-                   class="text-orange-600 hover:text-orange-900" title="Transfer Residence">
-                    <i class="fas fa-exchange-alt"></i>
-                </a>
+                                <a href="family_members.php?id=<?php echo $residence['id']; ?>"
+                                   class="text-purple-600 hover:text-purple-900" title="Manage Family Members">
+                                    <i class="fas fa-users"></i>
+                                </a>
+                                <a href="transfer_residence.php?id=<?php echo $residence['id']; ?>"
+                                   class="text-orange-600 hover:text-orange-900" title="Transfer Residence">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </a>
                                 <?php if ($residence['status'] === 'active'): ?>
                                     <a href="?delete=<?php echo $residence['id']; ?>" 
                                        class="text-red-600 hover:text-red-900" title="Deactivate Residence"
@@ -282,6 +320,7 @@ include 'includes/header.php';
                                        class="text-green-600 hover:text-green-900" title="Activate Residence">
                                         <i class="fas fa-check"></i>
                                     </a>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </td>

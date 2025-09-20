@@ -80,88 +80,31 @@ function getDashboardUrl($role) {
     return $urls[$role] ?? 'dashboard.php';
 }
 
-// Permission checking functions
-function hasPermission($permission_key) {
-    global $pdo;
-    
-    if (!isLoggedIn()) {
-        return false;
-    }
-    
-    $user_role = $_SESSION['user_role'];
-    
-    // Super admin always has all permissions
-    if ($user_role === 'super_admin') {
-        return true;
-    }
-    
-    try {
-        $stmt = $pdo->prepare("SELECT is_granted FROM permissions WHERE role = ? AND permission_key = ?");
-        $stmt->execute([$user_role, $permission_key]);
-        $result = $stmt->fetch();
-        
-        return $result ? (bool)$result['is_granted'] : false;
-    } catch (PDOException $e) {
-        return false;
-    }
-}
-
-function requirePermission($permission_key) {
-    if (!hasPermission($permission_key)) {
-        header('Location: unauthorized.php');
-        exit();
-    }
-}
-
-// Updated role checking functions to use permissions
+// Legacy permission functions (kept for backward compatibility)
 function canManageUsers() {
-    return hasPermission('manage_users');
+    return canAccessPage('users');
 }
 
 function canManageResidences() {
-    return hasPermission('manage_residences');
+    return canAccessPage('residences');
 }
 
 function canViewReports() {
-    return hasPermission('view_reports');
+    return canAccessPage('reports');
 }
 
 function canManagePermissions() {
-    return hasPermission('manage_permissions');
+    return canAccessPage('permissions');
 }
 
 function canViewAllData() {
-    return hasPermission('view_all_data');
+    return isSuperAdmin();
 }
 
 function canViewOwnData() {
-    return hasPermission('view_own_data');
+    return !isSuperAdmin();
 }
 
-// Get all permissions for a role
-function getRolePermissions($role) {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->prepare("SELECT permission_key, permission_name, is_granted FROM permissions WHERE role = ? ORDER BY permission_name");
-        $stmt->execute([$role]);
-        return $stmt->fetchAll();
-    } catch (PDOException $e) {
-        return [];
-    }
-}
-
-// Update permission for a role
-function updatePermission($role, $permission_key, $is_granted) {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->prepare("UPDATE permissions SET is_granted = ? WHERE role = ? AND permission_key = ?");
-        return $stmt->execute([$is_granted, $role, $permission_key]);
-    } catch (PDOException $e) {
-        return false;
-    }
-}
 
 // System Settings Functions
 function getSystemSetting($setting_key, $default = null) {
@@ -541,11 +484,7 @@ function getPendingTransfersForVEO() {
             LEFT JOIN villages tv ON rt.to_village_id = tv.id
             LEFT JOIN users u ON rt.requested_by = u.id
             WHERE rt.to_village_id = ?
-            AND (
-                (rt.transfer_type = 'veo' AND rt.status = 'ward_approved')
-                OR 
-                (rt.transfer_type = 'ward_admin' AND rt.status = 'ward_approved')
-            )
+            AND rt.status = 'ward_approved'
             ORDER BY rt.created_at DESC
         ");
         $stmt->execute([$user_location['village_id']]);
@@ -580,12 +519,11 @@ function getPendingTransfersForWEO() {
             LEFT JOIN wards tw ON rt.to_ward_id = tw.id
             LEFT JOIN villages tv ON rt.to_village_id = tv.id
             LEFT JOIN users u ON rt.requested_by = u.id
-            WHERE rt.from_ward_id = ?
+            WHERE (rt.from_ward_id = ? OR rt.to_ward_id = ?)
             AND rt.status = 'pending_approval'
-            AND rt.transfer_type = 'veo'
             ORDER BY rt.created_at DESC
         ");
-        $stmt->execute([$user_location['ward_id']]);
+        $stmt->execute([$user_location['ward_id'], $user_location['ward_id']]);
         return $stmt->fetchAll();
     } catch (PDOException $e) {
         return [];
@@ -618,11 +556,7 @@ function getPendingTransfersForWardAdmin() {
             LEFT JOIN villages tv ON rt.to_village_id = tv.id
             LEFT JOIN users u ON rt.requested_by = u.id
             WHERE rt.to_ward_id = ?
-            AND (
-                (rt.transfer_type = 'veo' AND rt.status = 'weo_approved')
-                OR 
-                (rt.transfer_type = 'ward_admin' AND rt.status = 'pending_approval')
-            )
+            AND rt.status = 'weo_approved'
             ORDER BY rt.created_at DESC
         ");
         $stmt->execute([$user_location['ward_id']]);
@@ -631,4 +565,224 @@ function getPendingTransfersForWardAdmin() {
         return [];
     }
 }
+
+// Permission management functions
+function hasPermission($page_name, $action_name = 'view') {
+    if (isSuperAdmin()) {
+        return true;
+    }
+    
+    global $pdo;
+    try {
+        // First check user-specific permissions (overrides role permissions)
+        $stmt = $pdo->prepare("
+            SELECT up.can_access
+            FROM user_permissions up
+            JOIN permission_pages pp ON up.page_id = pp.id
+            LEFT JOIN permission_actions pa ON up.action_id = pa.id
+            WHERE up.user_id = ? 
+            AND pp.page_name = ? 
+            AND (pa.action_name = ? OR (pa.action_name IS NULL AND ? = 'view'))
+            AND pp.is_active = TRUE
+            AND (pa.is_active = TRUE OR pa.is_active IS NULL)
+        ");
+        $stmt->execute([$_SESSION['user_id'], $page_name, $action_name, $action_name]);
+        $user_result = $stmt->fetch();
+        
+        // If user has specific permission set, use that
+        if ($user_result !== false) {
+            return (bool)$user_result['can_access'];
+        }
+        
+        // Otherwise, fall back to role permissions
+        $stmt = $pdo->prepare("
+            SELECT rp.can_access
+            FROM role_permissions rp
+            JOIN permission_pages pp ON rp.page_id = pp.id
+            LEFT JOIN permission_actions pa ON rp.action_id = pa.id
+            WHERE rp.role = ? 
+            AND pp.page_name = ? 
+            AND (pa.action_name = ? OR (pa.action_name IS NULL AND ? = 'view'))
+            AND pp.is_active = TRUE
+            AND (pa.is_active = TRUE OR pa.is_active IS NULL)
+        ");
+        $stmt->execute([$_SESSION['user_role'], $page_name, $action_name, $action_name]);
+        $result = $stmt->fetch();
+        return $result ? (bool)$result['can_access'] : false;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function canAccessPage($page_name) {
+    return hasPermission($page_name, 'view');
+}
+
+function canPerformAction($page_name, $action_name) {
+    return hasPermission($page_name, $action_name);
+}
+
+function getRolePermissions($role) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                pm.module_name, pm.module_display_name, pm.module_icon,
+                pp.page_name, pp.page_display_name, pp.page_url, pp.page_icon,
+                pa.action_name, pa.action_display_name, pa.action_type,
+                rp.can_access
+            FROM role_permissions rp
+            JOIN permission_pages pp ON rp.page_id = pp.id
+            JOIN permission_modules pm ON pp.module_id = pm.id
+            LEFT JOIN permission_actions pa ON rp.action_id = pa.id
+            WHERE rp.role = ?
+            AND pp.is_active = TRUE
+            AND (pa.is_active = TRUE OR pa.is_active IS NULL)
+            ORDER BY pm.sort_order, pp.sort_order, pa.action_name
+        ");
+        $stmt->execute([$role]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+function getAllModules() {
+    global $pdo;
+    try {
+        $stmt = $pdo->query("
+            SELECT * FROM permission_modules 
+            WHERE is_active = TRUE 
+            ORDER BY sort_order
+        ");
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+function getPagesByModule($module_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT * FROM permission_pages 
+            WHERE module_id = ? AND is_active = TRUE 
+            ORDER BY sort_order
+        ");
+        $stmt->execute([$module_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+function getActionsByPage($page_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT * FROM permission_actions 
+            WHERE page_id = ? AND is_active = TRUE 
+            ORDER BY action_name
+        ");
+        $stmt->execute([$page_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+function updateRolePermission($role, $page_id, $action_id, $can_access) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO role_permissions (role, page_id, action_id, can_access) 
+            VALUES (?, ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE can_access = ?
+        ");
+        return $stmt->execute([$role, $page_id, $action_id, $can_access, $can_access]);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function getAvailableRoles() {
+    return ['super_admin', 'admin', 'weo', 'veo', 'data_collector'];
+}
+
+// User-specific permission functions
+function getUserPermissions($user_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT up.page_id, up.action_id, up.can_access, pp.page_name, pa.action_name
+            FROM user_permissions up
+            JOIN permission_pages pp ON up.page_id = pp.id
+            LEFT JOIN permission_actions pa ON up.action_id = pa.id
+            WHERE up.user_id = ?
+            ORDER BY pp.page_name, pa.action_name
+        ");
+        $stmt->execute([$user_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+function setUserPermission($user_id, $page_id, $action_id, $can_access) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO user_permissions (user_id, page_id, action_id, can_access) 
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE can_access = VALUES(can_access)
+        ");
+        return $stmt->execute([$user_id, $page_id, $action_id, $can_access]);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function removeUserPermission($user_id, $page_id, $action_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            DELETE FROM user_permissions 
+            WHERE user_id = ? AND page_id = ? AND action_id = ?
+        ");
+        return $stmt->execute([$user_id, $page_id, $action_id]);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function clearUserPermissions($user_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("DELETE FROM user_permissions WHERE user_id = ?");
+        return $stmt->execute([$user_id]);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function getUserPermissionStatus($user_id, $page_name, $action_name = 'view') {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT up.can_access
+            FROM user_permissions up
+            JOIN permission_pages pp ON up.page_id = pp.id
+            LEFT JOIN permission_actions pa ON up.action_id = pa.id
+            WHERE up.user_id = ? 
+            AND pp.page_name = ? 
+            AND (pa.action_name = ? OR (pa.action_name IS NULL AND ? = 'view'))
+        ");
+        $stmt->execute([$user_id, $page_name, $action_name, $action_name]);
+        $result = $stmt->fetch();
+        return $result ? (bool)$result['can_access'] : null; // null means no specific permission set
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
 ?>

@@ -3,7 +3,11 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
-requirePermission('view_reports');
+// Check if user has permission to view reports
+if (!canAccessPage('reports')) {
+    header('Location: unauthorized.php');
+    exit();
+}
 
 $page_title = 'Reports';
 
