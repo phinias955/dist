@@ -856,10 +856,7 @@ include 'includes/header.php';
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title"><?php echo $report_title; ?></h4>
-                    <p class="text-muted"><?php echo $report_subtitle; ?></p>
-                </div>
+                
                 <div class="card-body">
                     <?php if (isset($error_message)): ?>
                         <div class="alert alert-danger">
@@ -867,20 +864,7 @@ include 'includes/header.php';
                         </div>
                     <?php else: ?>
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h5>Export Options</h5>
-                                <div class="btn-group" role="group">
-                                    <a href="?export=pdf" class="btn btn-danger">
-                                        <i class="mdi mdi-file-pdf"></i> Export PDF
-                                    </a>
-                                    <a href="?export=excel" class="btn btn-success">
-                                        <i class="mdi mdi-file-excel"></i> Export Excel
-                                    </a>
-                                    <a href="?export=csv" class="btn btn-info">
-                                        <i class="mdi mdi-file-csv"></i> Export CSV
-                                    </a>
-                                </div>
-                            </div>
+                            
                             <div class="col-md-6 text-right">
                                 <p class="text-muted">
                                     <strong>Generated on:</strong> <?php echo date('Y-m-d H:i:s'); ?><br>
