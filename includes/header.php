@@ -53,6 +53,7 @@ if (!isset($page_title)) {
                 </div>
             </div>
             
+            
             <!-- Navigation Menu -->
             <nav class="mt-4">
                 <ul class="space-y-1 px-4">
