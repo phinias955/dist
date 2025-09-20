@@ -35,10 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Passwords do not match';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters long';
-    } elseif (!in_array($role, ['admin', 'weo', 'veo'])) {
+    } elseif (!in_array($role, ['admin', 'weo', 'veo', 'data_collector'])) {
         $error = 'Invalid role selected';
     } elseif ($role === 'veo' && (!$assigned_ward_id || !$assigned_village_id)) {
         $error = 'Both Ward and Street/Village assignment are required for VEO role';
+    } elseif ($role === 'data_collector' && (!$assigned_ward_id || !$assigned_village_id)) {
+        $error = 'Both Ward and Street/Village assignment are required for Data Collector role';
     } elseif (in_array($role, ['admin', 'weo']) && !$assigned_ward_id) {
         $error = 'Ward assignment is required for Admin and WEO roles';
     } else {
@@ -144,6 +146,7 @@ include 'includes/header.php';
                         <option value="admin" <?php echo (isset($_POST['role']) && $_POST['role'] === 'admin') ? 'selected' : ''; ?>>Administrator</option>
                         <option value="weo" <?php echo (isset($_POST['role']) && $_POST['role'] === 'weo') ? 'selected' : ''; ?>>Ward Executive Officer (WEO)</option>
                         <option value="veo" <?php echo (isset($_POST['role']) && $_POST['role'] === 'veo') ? 'selected' : ''; ?>>Village Executive Officer (VEO)</option>
+                        <option value="data_collector" <?php echo (isset($_POST['role']) && $_POST['role'] === 'data_collector') ? 'selected' : ''; ?>>Data Collector</option>
                     </select>
                 </div>
                 
@@ -195,7 +198,7 @@ include 'includes/header.php';
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">Required for VEO role</p>
+                        <p class="text-xs text-gray-500 mt-1">Required for VEO and Data Collector roles</p>
                     </div>
                 </div>
             </div>
@@ -219,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const villageField = document.getElementById('village_assignment_field');
     
     // Check if a role is already selected (form submission with errors)
-    if (roleSelect.value === 'veo') {
+    if (roleSelect.value === 'veo' || roleSelect.value === 'data_collector') {
         villageField.classList.remove('hidden');
     } else {
         villageField.classList.add('hidden');
@@ -254,8 +257,8 @@ document.getElementById('role').addEventListener('change', function() {
     const villageField = document.getElementById('village_assignment_field');
     const villageSelect = document.getElementById('assigned_village_id');
     
-    if (role === 'veo') {
-        // Show village assignment field for VEO
+    if (role === 'veo' || role === 'data_collector') {
+        // Show village assignment field for VEO and Data Collector
         villageField.classList.remove('hidden');
         wardSelect.required = true;
         villageSelect.required = true;
@@ -287,10 +290,10 @@ document.getElementById('userForm').addEventListener('submit', function(e) {
         return false;
     }
     
-    if (role === 'veo') {
+    if (role === 'veo' || role === 'data_collector') {
         if (!wardId || !villageId) {
             e.preventDefault();
-            alert('Both Ward and Street/Village assignment are required for VEO role');
+            alert('Both Ward and Street/Village assignment are required for ' + (role === 'veo' ? 'VEO' : 'Data Collector') + ' role');
             return false;
         }
     } else {

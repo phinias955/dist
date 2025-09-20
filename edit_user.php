@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (empty($full_name) || empty($username) || empty($role) || empty($nida_number)) {
         $error = 'All fields are required';
-    } elseif (!in_array($role, ['admin', 'weo', 'veo'])) {
+    } elseif (!in_array($role, ['admin', 'weo', 'veo', 'data_collector'])) {
         $error = 'Invalid role selected';
     } elseif ($change_password && $new_password !== $confirm_password) {
         $error = 'New passwords do not match';
@@ -90,6 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'New password must be at least 6 characters long';
     } elseif ($role === 'veo' && (!$assigned_ward_id || !$assigned_village_id)) {
         $error = 'VEO role requires both ward and street/village assignment';
+    } elseif ($role === 'data_collector' && (!$assigned_ward_id || !$assigned_village_id)) {
+        $error = 'Data Collector role requires both ward and street/village assignment';
     } elseif (($role === 'admin' || $role === 'weo') && !$assigned_ward_id) {
         $error = 'Admin and WEO roles require ward assignment';
     } elseif ($assigned_ward_id && !canAccessWard($assigned_ward_id)) {
@@ -191,6 +193,7 @@ include 'includes/header.php';
                         <option value="admin" <?php echo $user['role'] === 'admin' ? 'selected' : ''; ?>>Administrator</option>
                         <option value="weo" <?php echo $user['role'] === 'weo' ? 'selected' : ''; ?>>Ward Executive Officer (WEO)</option>
                         <option value="veo" <?php echo $user['role'] === 'veo' ? 'selected' : ''; ?>>Village Executive Officer (VEO)</option>
+                        <option value="data_collector" <?php echo $user['role'] === 'data_collector' ? 'selected' : ''; ?>>Data Collector</option>
                     </select>
                 </div>
                 
@@ -320,7 +323,7 @@ document.getElementById('role').addEventListener('change', function() {
     const villageField = document.getElementById('village_assignment_field');
     const villageSelect = document.getElementById('assigned_village_id');
     
-    if (role === 'veo') {
+    if (role === 'veo' || role === 'data_collector') {
         villageSelect.required = true;
         villageField.querySelector('label').innerHTML = '<i class="fas fa-home mr-2"></i>Assigned Street/Village *';
     } else {
@@ -358,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const villageSelect = document.getElementById('assigned_village_id');
     
     // Set initial state based on current role
-    if (roleSelect.value === 'veo') {
+    if (roleSelect.value === 'veo' || roleSelect.value === 'data_collector') {
         villageSelect.required = true;
         villageField.querySelector('label').innerHTML = '<i class="fas fa-home mr-2"></i>Assigned Street/Village *';
     } else {

@@ -64,7 +64,8 @@ function getRoleDisplayName($role) {
         'super_admin' => 'Super Administrator',
         'admin' => 'Administrator',
         'weo' => 'Ward Executive Officer',
-        'veo' => 'Village Executive Officer'
+        'veo' => 'Village Executive Officer',
+        'data_collector' => 'Data Collector'
     ];
     return $roles[$role] ?? $role;
 }
