@@ -48,19 +48,75 @@ CREATE TABLE users (
 -- Residence records table
 CREATE TABLE residences (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    house_no VARCHAR(50) NOT NULL,
     resident_name VARCHAR(255) NOT NULL,
+    gender ENUM('male', 'female', 'other') NOT NULL,
+    date_of_birth DATE NOT NULL,
     nida_number VARCHAR(20) NOT NULL,
-    address TEXT NOT NULL,
     phone VARCHAR(15),
     email VARCHAR(100),
     occupation VARCHAR(100),
+    ownership ENUM('owner', 'tenant') NOT NULL,
     family_members INT DEFAULT 1,
+    education_level ENUM('none', 'primary', 'secondary', 'diploma', 'degree', 'masters', 'phd') DEFAULT 'none',
+    employment_status ENUM('employed', 'unemployed', 'student', 'retired', 'self_employed') DEFAULT 'unemployed',
     ward_id INT NOT NULL,
     village_id INT NOT NULL,
     registered_by INT NOT NULL,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('active', 'inactive', 'moved') DEFAULT 'active',
+    status ENUM('active', 'inactive', 'moved', 'pending_approval') DEFAULT 'active',
     FOREIGN KEY (registered_by) REFERENCES users(id),
+    FOREIGN KEY (ward_id) REFERENCES wards(id),
+    FOREIGN KEY (village_id) REFERENCES villages(id)
+);
+
+-- Family members table
+CREATE TABLE family_members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    residence_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    gender ENUM('male', 'female', 'other') NOT NULL,
+    date_of_birth DATE,
+    nida_number VARCHAR(20),
+    relationship ENUM('spouse', 'child', 'parent', 'sibling', 'other') NOT NULL,
+    is_minor BOOLEAN DEFAULT FALSE,
+    phone VARCHAR(15),
+    email VARCHAR(100),
+    occupation VARCHAR(100),
+    education_level ENUM('none', 'primary', 'secondary', 'diploma', 'degree', 'masters', 'phd') DEFAULT 'none',
+    employment_status ENUM('employed', 'unemployed', 'student', 'retired', 'self_employed') DEFAULT 'unemployed',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (residence_id) REFERENCES residences(id) ON DELETE CASCADE
+);
+
+-- Deleted residences table for tracking deletions and transfers
+CREATE TABLE deleted_residences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_residence_id INT,
+    house_no VARCHAR(50) NOT NULL,
+    resident_name VARCHAR(255) NOT NULL,
+    gender ENUM('male', 'female', 'other') NOT NULL,
+    date_of_birth DATE NOT NULL,
+    nida_number VARCHAR(20) NOT NULL,
+    phone VARCHAR(15),
+    email VARCHAR(100),
+    occupation VARCHAR(100),
+    ownership ENUM('owner', 'tenant') NOT NULL,
+    family_members INT DEFAULT 1,
+    education_level ENUM('none', 'primary', 'secondary', 'diploma', 'degree', 'masters', 'phd') DEFAULT 'none',
+    employment_status ENUM('employed', 'unemployed', 'student', 'retired', 'self_employed') DEFAULT 'unemployed',
+    ward_id INT NOT NULL,
+    village_id INT NOT NULL,
+    registered_by INT NOT NULL,
+    original_registered_at TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_by INT NOT NULL,
+    deletion_reason ENUM('deleted', 'transferred', 'moved') NOT NULL,
+    status ENUM('pending_approval', 'approved', 'rejected') DEFAULT 'pending_approval',
+    approved_by INT NULL,
+    approved_at TIMESTAMP NULL,
+    FOREIGN KEY (deleted_by) REFERENCES users(id),
+    FOREIGN KEY (approved_by) REFERENCES users(id),
     FOREIGN KEY (ward_id) REFERENCES wards(id),
     FOREIGN KEY (village_id) REFERENCES villages(id)
 );
@@ -91,12 +147,12 @@ CREATE TABLE system_settings (
 );
 
 -- Insert default super admin
-INSERT INTO users (full_name, username, password, role, nida_number) 
-VALUES ('Super Administrator', 'superadmin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', '12345678901234567890');
+INSERT INTO users (full_name, username, password, role, nida_number, assigned_ward_id) 
+VALUES ('Super Administrator', 'superadmin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', '12345678901234567890', 1);
 
 -- Insert sample admin
-INSERT INTO users (full_name, username, password, role, nida_number) 
-VALUES ('System Administrator', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', '12345678901234567891');
+INSERT INTO users (full_name, username, password, role, nida_number, assigned_ward_id) 
+VALUES ('System Administrator', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', '12345678901234567891', 1);
 
 -- Insert default permissions for each role
 INSERT INTO permissions (role, permission_key, permission_name, is_granted) VALUES
@@ -150,6 +206,12 @@ INSERT INTO villages (village_name, village_code, ward_id, description, created_
 ('Village C', 'V003', 2, 'Main village in Ward 2', 1),
 ('Village D', 'V004', 2, 'Secondary village in Ward 2', 1),
 ('Village E', 'V005', 3, 'Main village in Ward 3', 1);
+
+-- Insert sample residences
+INSERT INTO residences (house_no, resident_name, gender, date_of_birth, nida_number, phone, email, occupation, ownership, family_members, education_level, employment_status, ward_id, village_id, registered_by) VALUES
+('H001', 'John Mwalimu', 'male', '1985-03-15', '12345678901234567890', '0712345678', 'john@email.com', 'Teacher', 'owner', 3, 'degree', 'employed', 1, 1, 1),
+('H002', 'Mary Kimaro', 'female', '1990-07-22', '12345678901234567891', '0723456789', 'mary@email.com', 'Nurse', 'tenant', 2, 'diploma', 'employed', 1, 1, 1),
+('H003', 'Peter Mwangi', 'male', '1978-12-10', '12345678901234567892', '0734567890', 'peter@email.com', 'Farmer', 'owner', 4, 'secondary', 'self_employed', 2, 3, 1);
 
 -- Now add foreign key constraints for created_by fields
 ALTER TABLE wards ADD FOREIGN KEY (created_by) REFERENCES users(id);

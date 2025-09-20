@@ -15,19 +15,24 @@ $accessible_wards = getAccessibleWards();
 $accessible_villages = getAccessibleVillages();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $house_no = sanitizeInput($_POST['house_no']);
     $resident_name = sanitizeInput($_POST['resident_name']);
+    $gender = $_POST['gender'];
+    $date_of_birth = $_POST['date_of_birth'];
     $nida_number = sanitizeInput($_POST['nida_number']);
-    $address = sanitizeInput($_POST['address']);
     $phone = sanitizeInput($_POST['phone']);
     $email = sanitizeInput($_POST['email']);
     $occupation = sanitizeInput($_POST['occupation']);
+    $ownership = $_POST['ownership'];
     $family_members = (int)$_POST['family_members'];
+    $education_level = $_POST['education_level'];
+    $employment_status = $_POST['employment_status'];
     $ward_id = (int)$_POST['ward_id'];
     $village_id = (int)$_POST['village_id'];
     
     // Validation
-    if (empty($resident_name) || empty($nida_number) || empty($address)) {
-        $error = 'Name, NIDA number, and address are required';
+    if (empty($house_no) || empty($resident_name) || empty($nida_number) || empty($date_of_birth)) {
+        $error = 'House number, name, NIDA number, and date of birth are required';
     } elseif ($family_members < 1) {
         $error = 'Family members must be at least 1';
     } elseif (!$ward_id || !$village_id) {
@@ -36,20 +41,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'You do not have permission to register residences in the selected location';
     } else {
         try {
-            // Check if NIDA number already exists
-            $stmt = $pdo->prepare("SELECT id FROM residences WHERE nida_number = ?");
+            // Check if NIDA number already exists in active residences
+            $stmt = $pdo->prepare("SELECT id, resident_name, house_no FROM residences WHERE nida_number = ? AND status = 'active'");
             $stmt->execute([$nida_number]);
-            if ($stmt->fetch()) {
-                $error = 'NIDA number already exists in the system';
+            $existing_residence = $stmt->fetch();
+            
+            if ($existing_residence) {
+                $error = 'NIDA number already exists in the system. Resident: ' . $existing_residence['resident_name'] . ' (House: ' . $existing_residence['house_no'] . ')';
             } else {
-                // Insert new residence
-                $stmt = $pdo->prepare("INSERT INTO residences (resident_name, nida_number, address, phone, email, occupation, family_members, ward_id, village_id, registered_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$resident_name, $nida_number, $address, $phone, $email, $occupation, $family_members, $ward_id, $village_id, $_SESSION['user_id']]);
+                // Check if NIDA exists in deleted residences for potential restoration
+                $stmt = $pdo->prepare("SELECT id, resident_name, house_no, status FROM deleted_residences WHERE nida_number = ?");
+                $stmt->execute([$nida_number]);
+                $deleted_residence = $stmt->fetch();
                 
-                $message = 'Residence registered successfully';
-                // Clear form
-                $resident_name = $nida_number = $address = $phone = $email = $occupation = '';
-                $family_members = 1;
+                if ($deleted_residence) {
+                    $error = 'This NIDA number was previously registered but deleted. Resident: ' . $deleted_residence['resident_name'] . ' (House: ' . $deleted_residence['house_no'] . '). Please contact administrator to restore or use a different NIDA number.';
+                } else {
+                    // Insert new residence
+                    $stmt = $pdo->prepare("INSERT INTO residences (house_no, resident_name, gender, date_of_birth, nida_number, phone, email, occupation, ownership, family_members, education_level, employment_status, ward_id, village_id, registered_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$house_no, $resident_name, $gender, $date_of_birth, $nida_number, $phone, $email, $occupation, $ownership, $family_members, $education_level, $employment_status, $ward_id, $village_id, $_SESSION['user_id']]);
+                    
+                    $residence_id = $pdo->lastInsertId();
+                    $message = 'Residence registered successfully. <a href="family_members.php?id=' . $residence_id . '" class="text-blue-600 hover:underline">Add family members</a>';
+                    
+                    // Clear form
+                    $house_no = $resident_name = $nida_number = $phone = $email = $occupation = '';
+                    $date_of_birth = '';
+                    $family_members = 1;
+                    $ward_id = $village_id = 0;
+                }
             }
         } catch (PDOException $e) {
             $error = 'Database error occurred';
@@ -79,7 +99,7 @@ include 'includes/header.php';
             </div>
         <?php endif; ?>
         
-        <form method="POST" class="space-y-6" id="residenceForm">
+        <form method="POST" class="space-y-6" id="addResidenceForm">
             <!-- Personal Information -->
             <div class="bg-gray-50 p-4 rounded-lg">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">
@@ -88,61 +108,139 @@ include 'includes/header.php';
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
+                        <label for="house_no" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-home mr-2"></i>House Number *
+                        </label>
+                        <input type="text" id="house_no" name="house_no" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               value="<?php echo htmlspecialchars($house_no ?? ''); ?>">
+                    </div>
+                    
+                    <div>
                         <label for="resident_name" class="block text-sm font-medium text-gray-700 mb-2">
-                            Full Name *
+                            <i class="fas fa-user mr-2"></i>Full Name *
                         </label>
                         <input type="text" id="resident_name" name="resident_name" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['resident_name']) ? htmlspecialchars($_POST['resident_name']) : ''; ?>">
+                               value="<?php echo htmlspecialchars($resident_name ?? ''); ?>">
+                    </div>
+                    
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-venus-mars mr-2"></i>Gender *
+                        </label>
+                        <select id="gender" name="gender" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Gender</option>
+                            <option value="male" <?php echo (isset($gender) && $gender === 'male') ? 'selected' : ''; ?>>Male</option>
+                            <option value="female" <?php echo (isset($gender) && $gender === 'female') ? 'selected' : ''; ?>>Female</option>
+                            <option value="other" <?php echo (isset($gender) && $gender === 'other') ? 'selected' : ''; ?>>Other</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="date_of_birth" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar mr-2"></i>Date of Birth *
+                        </label>
+                        <input type="date" id="date_of_birth" name="date_of_birth" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               value="<?php echo $date_of_birth ?? ''; ?>">
                     </div>
                     
                     <div>
                         <label for="nida_number" class="block text-sm font-medium text-gray-700 mb-2">
-                            NIDA Number *
+                            <i class="fas fa-id-card mr-2"></i>NIDA Number *
                         </label>
                         <input type="text" id="nida_number" name="nida_number" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['nida_number']) ? htmlspecialchars($_POST['nida_number']) : ''; ?>">
+                               value="<?php echo htmlspecialchars($nida_number ?? ''); ?>">
                     </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    
                     <div>
                         <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number
+                            <i class="fas fa-phone mr-2"></i>Phone Number
                         </label>
                         <input type="tel" id="phone" name="phone"
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
+                               value="<?php echo htmlspecialchars($phone ?? ''); ?>">
                     </div>
                     
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
+                            <i class="fas fa-envelope mr-2"></i>Email Address
                         </label>
                         <input type="email" id="email" name="email"
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                               value="<?php echo htmlspecialchars($email ?? ''); ?>">
                     </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    
                     <div>
                         <label for="occupation" class="block text-sm font-medium text-gray-700 mb-2">
-                            Occupation
+                            <i class="fas fa-briefcase mr-2"></i>Occupation
                         </label>
                         <input type="text" id="occupation" name="occupation"
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['occupation']) ? htmlspecialchars($_POST['occupation']) : ''; ?>">
+                               value="<?php echo htmlspecialchars($occupation ?? ''); ?>">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Residence Information -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-home mr-2"></i>Residence Information
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="ownership" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-key mr-2"></i>Ownership *
+                        </label>
+                        <select id="ownership" name="ownership" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Ownership</option>
+                            <option value="owner" <?php echo (isset($ownership) && $ownership === 'owner') ? 'selected' : ''; ?>>Owner</option>
+                            <option value="tenant" <?php echo (isset($ownership) && $ownership === 'tenant') ? 'selected' : ''; ?>>Tenant</option>
+                        </select>
                     </div>
                     
                     <div>
                         <label for="family_members" class="block text-sm font-medium text-gray-700 mb-2">
-                            Family Members *
+                            <i class="fas fa-users mr-2"></i>Number of Family Members *
                         </label>
                         <input type="number" id="family_members" name="family_members" min="1" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo isset($_POST['family_members']) ? $_POST['family_members'] : '1'; ?>">
+                               value="<?php echo $family_members ?? 1; ?>">
+                    </div>
+                    
+                    <div>
+                        <label for="education_level" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-graduation-cap mr-2"></i>Education Level
+                        </label>
+                        <select id="education_level" name="education_level"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="none" <?php echo (isset($education_level) && $education_level === 'none') ? 'selected' : ''; ?>>No Formal Education</option>
+                            <option value="primary" <?php echo (isset($education_level) && $education_level === 'primary') ? 'selected' : ''; ?>>Primary</option>
+                            <option value="secondary" <?php echo (isset($education_level) && $education_level === 'secondary') ? 'selected' : ''; ?>>Secondary</option>
+                            <option value="diploma" <?php echo (isset($education_level) && $education_level === 'diploma') ? 'selected' : ''; ?>>Diploma</option>
+                            <option value="degree" <?php echo (isset($education_level) && $education_level === 'degree') ? 'selected' : ''; ?>>Degree</option>
+                            <option value="masters" <?php echo (isset($education_level) && $education_level === 'masters') ? 'selected' : ''; ?>>Masters</option>
+                            <option value="phd" <?php echo (isset($education_level) && $education_level === 'phd') ? 'selected' : ''; ?>>PhD</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="employment_status" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-briefcase mr-2"></i>Employment Status
+                        </label>
+                        <select id="employment_status" name="employment_status"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="unemployed" <?php echo (isset($employment_status) && $employment_status === 'unemployed') ? 'selected' : ''; ?>>Unemployed</option>
+                            <option value="employed" <?php echo (isset($employment_status) && $employment_status === 'employed') ? 'selected' : ''; ?>>Employed</option>
+                            <option value="self_employed" <?php echo (isset($employment_status) && $employment_status === 'self_employed') ? 'selected' : ''; ?>>Self Employed</option>
+                            <option value="student" <?php echo (isset($employment_status) && $employment_status === 'student') ? 'selected' : ''; ?>>Student</option>
+                            <option value="retired" <?php echo (isset($employment_status) && $employment_status === 'retired') ? 'selected' : ''; ?>>Retired</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -153,18 +251,17 @@ include 'includes/header.php';
                     <i class="fas fa-map-marker-alt mr-2"></i>Location Information
                 </h3>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label for="ward_id" class="block text-sm font-medium text-gray-700 mb-2">
-                            Ward *
+                            <i class="fas fa-building mr-2"></i>Ward *
                         </label>
-                        <select id="ward_id" name="ward_id" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <select id="ward_id" name="ward_id" required>
                             <option value="">Select Ward</option>
                             <?php foreach ($accessible_wards as $ward): ?>
                                 <option value="<?php echo $ward['id']; ?>" 
-                                        <?php echo (isset($_POST['ward_id']) && $_POST['ward_id'] == $ward['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($ward['ward_name']); ?>
+                                        <?php echo (isset($ward_id) && $ward_id == $ward['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($ward['ward_name'] . ' (' . $ward['ward_code'] . ')'); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -172,29 +269,19 @@ include 'includes/header.php';
                     
                     <div>
                         <label for="village_id" class="block text-sm font-medium text-gray-700 mb-2">
-                            Street/Village *
+                            <i class="fas fa-home mr-2"></i>Street/Village *
                         </label>
-                        <select id="village_id" name="village_id" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <select id="village_id" name="village_id" required>
                             <option value="">Select Street/Village</option>
                             <?php foreach ($accessible_villages as $village): ?>
                                 <option value="<?php echo $village['id']; ?>" 
                                         data-ward-id="<?php echo $village['ward_id']; ?>"
-                                        <?php echo (isset($_POST['village_id']) && $_POST['village_id'] == $village['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($village['village_name']); ?>
+                                        <?php echo (isset($village_id) && $village_id == $village['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($village['village_name'] . ' (' . $village['village_code'] . ')'); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                </div>
-                
-                <div>
-                    <label for="address" class="block text-sm font-medium text-gray-700 mb-2">
-                        Full Address *
-                    </label>
-                    <textarea id="address" name="address" rows="3" required
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Enter complete address including street, ward, district, region..."><?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?></textarea>
                 </div>
             </div>
             
@@ -211,41 +298,43 @@ include 'includes/header.php';
 </div>
 
 <script>
-// Ward-Village relationship handling
+// Ward-Village filtering
 document.getElementById('ward_id').addEventListener('change', function() {
-    const selectedWardId = this.value;
+    const wardId = this.value;
     const villageSelect = document.getElementById('village_id');
     
-    // Clear current selection
+    // Clear current options
     villageSelect.innerHTML = '<option value="">Select Street/Village</option>';
     
-    // Filter villages by selected ward
-    const allVillages = <?php echo json_encode($accessible_villages); ?>;
-    allVillages.forEach(village => {
-        if (village.ward_id == selectedWardId) {
+    if (wardId) {
+        // Filter villages by selected ward
+        const allVillages = <?php echo json_encode($accessible_villages); ?>;
+        const wardVillages = allVillages.filter(village => village.ward_id == wardId);
+        
+        wardVillages.forEach(village => {
             const option = document.createElement('option');
             option.value = village.id;
-            option.textContent = village.village_name;
-            option.setAttribute('data-ward-id', village.ward_id);
+            option.textContent = village.village_name + ' (' + village.village_code + ')';
             villageSelect.appendChild(option);
-        }
-    });
+        });
+    }
 });
 
-document.getElementById('residenceForm').addEventListener('submit', function(e) {
-    const familyMembers = document.getElementById('family_members').value;
+// Form validation
+document.getElementById('addResidenceForm').addEventListener('submit', function(e) {
     const wardId = document.getElementById('ward_id').value;
     const villageId = document.getElementById('village_id').value;
-    
-    if (familyMembers < 1) {
-        e.preventDefault();
-        alert('Family members must be at least 1');
-        return false;
-    }
+    const familyMembers = document.getElementById('family_members').value;
     
     if (!wardId || !villageId) {
         e.preventDefault();
         alert('Please select both Ward and Street/Village');
+        return false;
+    }
+    
+    if (familyMembers < 1) {
+        e.preventDefault();
+        alert('Family members must be at least 1');
         return false;
     }
 });

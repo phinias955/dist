@@ -38,7 +38,66 @@ if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
 
 // Get residences based on user location permissions
 try {
-    $residences = getAccessibleResidences();
+    if (isSuperAdmin()) {
+        // Super admin can see all residences
+        $stmt = $pdo->query("
+            SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
+                   u.full_name as registered_by_name
+            FROM residences r
+            LEFT JOIN wards w ON r.ward_id = w.id
+            LEFT JOIN villages v ON r.village_id = v.id
+            LEFT JOIN users u ON r.registered_by = u.id
+            ORDER BY r.registered_at DESC
+        ");
+    } else {
+        // Location-based access control for other roles
+        $user_location = getUserLocationInfo();
+        
+        if ($_SESSION['user_role'] === 'veo') {
+            // VEO can only see residences from their assigned village
+            if (!empty($user_location['village_id'])) {
+                $stmt = $pdo->prepare("
+                    SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
+                           u.full_name as registered_by_name
+                    FROM residences r
+                    LEFT JOIN wards w ON r.ward_id = w.id
+                    LEFT JOIN villages v ON r.village_id = v.id
+                    LEFT JOIN users u ON r.registered_by = u.id
+                    WHERE r.village_id = ?
+                    ORDER BY r.registered_at DESC
+                ");
+                $stmt->execute([$user_location['village_id']]);
+            } else {
+                $residences = []; // No village assigned
+            }
+        } elseif ($_SESSION['user_role'] === 'weo' || $_SESSION['user_role'] === 'admin') {
+            // WEO and Admin can see residences from their assigned ward
+            if (!empty($user_location['ward_id'])) {
+                $stmt = $pdo->prepare("
+                    SELECT r.*, w.ward_name, w.ward_code, v.village_name, v.village_code,
+                           u.full_name as registered_by_name
+                    FROM residences r
+                    LEFT JOIN wards w ON r.ward_id = w.id
+                    LEFT JOIN villages v ON r.village_id = v.id
+                    LEFT JOIN users u ON r.registered_by = u.id
+                    WHERE r.ward_id = ?
+                    ORDER BY r.registered_at DESC
+                ");
+                $stmt->execute([$user_location['ward_id']]);
+            } else {
+                $residences = []; // No ward assigned
+            }
+        } else {
+            $residences = []; // Unknown role
+        }
+    }
+    
+    // Only fetch if $stmt is defined
+    if (isset($stmt)) {
+        $residences = $stmt->fetchAll();
+    } else {
+        $residences = [];
+    }
 } catch (PDOException $e) {
     $error = 'Database error occurred';
 }
@@ -76,13 +135,14 @@ include 'includes/header.php';
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">House No</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resident Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIDA Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ward</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Street/Village</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
                         <?php if (canViewAllData()): ?>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">By</th>
                         <?php endif; ?>
@@ -92,6 +152,9 @@ include 'includes/header.php';
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach ($residences as $residence): ?>
                     <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <?php echo htmlspecialchars($residence['house_no']); ?>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -108,16 +171,22 @@ include 'includes/header.php';
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                <?php echo $residence['gender'] === 'male' ? 'bg-blue-100 text-blue-800' : ($residence['gender'] === 'female' ? 'bg-pink-100 text-pink-800' : 'bg-gray-100 text-gray-800'); ?>">
+                                <?php echo ucfirst($residence['gender']); ?>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo htmlspecialchars($residence['nida_number']); ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php echo htmlspecialchars($residence['phone'] ?? 'N/A'); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo htmlspecialchars($residence['ward_name'] ?? 'N/A'); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?php echo htmlspecialchars($residence['village_name'] ?? 'N/A'); ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo htmlspecialchars($residence['phone'] ?? 'N/A'); ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -143,22 +212,26 @@ include 'includes/header.php';
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div class="flex space-x-2">
                                 <a href="view_residence.php?id=<?php echo $residence['id']; ?>" 
-                                   class="text-blue-600 hover:text-blue-900">
+                                   class="text-blue-600 hover:text-blue-900" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <a href="edit_residence.php?id=<?php echo $residence['id']; ?>" 
-                                   class="text-green-600 hover:text-green-900">
+                                   class="text-green-600 hover:text-green-900" title="Edit Residence">
                                     <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="family_members.php?id=<?php echo $residence['id']; ?>" 
+                                   class="text-purple-600 hover:text-purple-900" title="Manage Family Members">
+                                    <i class="fas fa-users"></i>
                                 </a>
                                 <?php if ($residence['status'] === 'active'): ?>
                                     <a href="?delete=<?php echo $residence['id']; ?>" 
-                                       class="text-red-600 hover:text-red-900"
+                                       class="text-red-600 hover:text-red-900" title="Deactivate Residence"
                                        onclick="return confirmDelete('Are you sure you want to deactivate this residence?')">
                                         <i class="fas fa-times"></i>
                                     </a>
                                 <?php else: ?>
                                     <a href="?activate=<?php echo $residence['id']; ?>" 
-                                       class="text-green-600 hover:text-green-900">
+                                       class="text-green-600 hover:text-green-900" title="Activate Residence">
                                         <i class="fas fa-check"></i>
                                     </a>
                                 <?php endif; ?>

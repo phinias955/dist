@@ -449,10 +449,25 @@ function getAccessibleVillages() {
 }
 
 function getAccessibleResidences() {
-    if (isSuperAdmin() || canViewAllData()) {
+    if (isSuperAdmin()) {
         global $pdo;
         try {
-            $stmt = $pdo->query("SELECT r.*, u.full_name as registered_by_name, w.ward_name, v.village_name 
+            $stmt = $pdo->query("SELECT r.*, u.full_name as registered_by_name, w.ward_name, w.ward_code, v.village_name, v.village_code
+                                FROM residences r 
+                                LEFT JOIN users u ON r.registered_by = u.id 
+                                LEFT JOIN wards w ON r.ward_id = w.id 
+                                LEFT JOIN villages v ON r.village_id = v.id 
+                                ORDER BY r.registered_at DESC");
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+    
+    if (canViewAllData()) {
+        global $pdo;
+        try {
+            $stmt = $pdo->query("SELECT r.*, u.full_name as registered_by_name, w.ward_name, w.ward_code, v.village_name, v.village_code
                                 FROM residences r 
                                 LEFT JOIN users u ON r.registered_by = u.id 
                                 LEFT JOIN wards w ON r.ward_id = w.id 
