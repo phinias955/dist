@@ -1,211 +1,401 @@
 <?php
 session_start();
-require_once 'config/database.php';
 require_once 'includes/functions.php';
+require_once 'config/database.php';
 
-// Check if user has permission to view reports
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+// Check if user can access reports
 if (!canAccessPage('reports')) {
     header('Location: unauthorized.php');
     exit();
 }
 
-$page_title = 'Reports';
+$user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'];
+$user_location = getUserLocationInfo($user_id);
 
-$error = '';
+// Get report data based on user role
+$report_data = [];
+$report_title = '';
+$report_subtitle = '';
 
-// Get statistics
 try {
-    // Total users by role
-    $stmt = $pdo->query("SELECT role, COUNT(*) as count FROM users WHERE is_active = 1 GROUP BY role");
-    $users_by_role = $stmt->fetchAll();
-    
-    // Total residences by status
-    $stmt = $pdo->query("SELECT status, COUNT(*) as count FROM residences GROUP BY status");
-    $residences_by_status = $stmt->fetchAll();
-    
-    // Monthly registrations (last 6 months)
-    $stmt = $pdo->query("SELECT 
-        DATE_FORMAT(registered_at, '%Y-%m') as month,
-        COUNT(*) as count 
-        FROM residences 
-        WHERE registered_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(registered_at, '%Y-%m')
-        ORDER BY month");
-    $monthly_registrations = $stmt->fetchAll();
-    
-    // Top registering users
-    $stmt = $pdo->query("SELECT 
-        u.full_name,
-        u.role,
-        COUNT(r.id) as total_registrations
-        FROM users u
-        LEFT JOIN residences r ON u.id = r.registered_by
-        WHERE u.is_active = 1
-        GROUP BY u.id
-        ORDER BY total_registrations DESC
-        LIMIT 10");
-    $top_users = $stmt->fetchAll();
+    if ($user_role === 'super_admin') {
+        // Super Admin sees all data
+        $report_title = 'System Overview Report';
+        $report_subtitle = 'All Wards and Villages';
+        
+        // Get all wards and villages
+        $stmt = $pdo->query("
+            SELECT w.ward_name, COUNT(DISTINCT v.id) as village_count, 
+                   COUNT(DISTINCT r.id) as residence_count,
+                   COUNT(DISTINCT fm.id) as family_member_count
+            FROM wards w
+            LEFT JOIN villages v ON w.id = v.ward_id
+            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            GROUP BY w.id, w.ward_name
+            ORDER BY w.ward_name
+        ");
+        $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } elseif ($user_role === 'admin') {
+        // Admin sees their ward data
+        $report_title = 'Ward Administration Report';
+        $report_subtitle = 'Ward: ' . $user_location['ward_name'];
+        
+        $stmt = $pdo->prepare("
+            SELECT v.village_name, COUNT(DISTINCT r.id) as residence_count,
+                   COUNT(DISTINCT fm.id) as family_member_count
+            FROM villages v
+            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE v.ward_id = ?
+            GROUP BY v.id, v.village_name
+            ORDER BY v.village_name
+        ");
+        $stmt->execute([$user_location['ward_id']]);
+        $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } elseif ($user_role === 'weo') {
+        // WEO sees their ward data
+        $report_title = 'Ward Executive Officer Report';
+        $report_subtitle = 'Ward: ' . $user_location['ward_name'];
+        
+        $stmt = $pdo->prepare("
+            SELECT v.village_name, COUNT(DISTINCT r.id) as residence_count,
+                   COUNT(DISTINCT fm.id) as family_member_count
+            FROM villages v
+            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE v.ward_id = ?
+            GROUP BY v.id, v.village_name
+            ORDER BY v.village_name
+        ");
+        $stmt->execute([$user_location['ward_id']]);
+        $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } elseif ($user_role === 'veo') {
+        // VEO sees their village data
+        $report_title = 'Village Executive Officer Report';
+        $report_subtitle = 'Village: ' . $user_location['village_name'];
+        
+        $stmt = $pdo->prepare("
+            SELECT r.resident_name, r.house_no, r.gender, r.date_of_birth,
+                   r.nida_number, r.phone, r.occupation, r.ownership,
+                   r.education_level, r.employment_status,
+                   COUNT(fm.id) as family_member_count
+            FROM residences r
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE r.village_id = ? AND r.status = 'active'
+            GROUP BY r.id, r.resident_name, r.house_no, r.gender, r.date_of_birth,
+                     r.nida_number, r.phone, r.occupation, r.ownership,
+                     r.education_level, r.employment_status
+            ORDER BY r.resident_name
+        ");
+        $stmt->execute([$user_location['village_id']]);
+        $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
 } catch (PDOException $e) {
-    $error = 'Database error occurred';
+    $error_message = "Error generating report: " . $e->getMessage();
+}
+
+// Handle export requests
+if (isset($_GET['export'])) {
+    $export_format = $_GET['export'];
+    
+    if ($export_format === 'pdf') {
+        // Generate PDF report using simple HTML to PDF conversion
+        $html = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>' . $report_title . '</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { color: #666; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .header-info { margin: 20px 0; }
+        .header-info p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>' . $report_title . '</h1>
+    <div class="header-info">
+        <p><strong>Generated on:</strong> ' . date('Y-m-d H:i:s') . '</p>
+        <p><strong>Generated by:</strong> ' . $_SESSION['username'] . ' (' . getRoleDisplayName($user_role) . ')</p>
+        <p><strong>Scope:</strong> ' . $report_subtitle . '</p>
+    </div>';
+        
+        if (!empty($report_data)) {
+            $html .= '<table>
+                <thead>
+                    <tr>';
+            
+            // Table headers based on role
+            if ($user_role === 'veo') {
+                $html .= '<th>Resident Name</th><th>House No</th><th>Gender</th><th>Date of Birth</th>';
+                $html .= '<th>NIDA Number</th><th>Phone</th><th>Occupation</th><th>Ownership</th>';
+                $html .= '<th>Education Level</th><th>Employment Status</th><th>Family Members</th>';
+            } else {
+                $html .= '<th>Location</th><th>Residences</th><th>Family Members</th>';
+            }
+            
+            $html .= '</tr>
+                </thead>
+                <tbody>';
+            
+            foreach ($report_data as $row) {
+                $html .= '<tr>';
+                if ($user_role === 'veo') {
+                    $html .= '<td>' . htmlspecialchars($row['resident_name']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['house_no']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['gender']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['date_of_birth']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['nida_number']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['phone']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['occupation']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['ownership']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['education_level']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($row['employment_status']) . '</td>';
+                    $html .= '<td>' . $row['family_member_count'] . '</td>';
+                } else {
+                    $html .= '<td>' . htmlspecialchars($row['village_name'] ?? $row['ward_name']) . '</td>';
+                    $html .= '<td>' . $row['residence_count'] . '</td>';
+                    $html .= '<td>' . $row['family_member_count'] . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            
+            $html .= '</tbody>
+            </table>';
+        } else {
+            $html .= '<p>No data available for the selected criteria.</p>';
+        }
+        
+        $html .= '</body></html>';
+        
+        // Set headers for PDF download
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="residence_report_' . date('Y-m-d_H-i-s') . '.pdf"');
+        
+        // For now, output HTML that can be printed as PDF by browser
+        echo $html;
+        exit();
+        
+    } elseif ($export_format === 'excel') {
+        // Generate Excel report using CSV format with .xlsx extension
+        $filename = 'residence_report_' . date('Y-m-d_H-i-s') . '.xlsx';
+        
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        
+        // Create a simple Excel-compatible format
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        echo "<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\">\n";
+        echo "<Worksheet ss:Name=\"Residence Report\">\n";
+        echo "<Table>\n";
+        
+        // Header row
+        echo "<Row>\n";
+        if ($user_role === 'veo') {
+            $headers = ['Resident Name', 'House No', 'Gender', 'Date of Birth', 'NIDA Number', 
+                       'Phone', 'Occupation', 'Ownership', 'Education Level', 'Employment Status', 'Family Members'];
+        } else {
+            $headers = ['Location', 'Residences', 'Family Members'];
+        }
+        
+        foreach ($headers as $header) {
+            echo "<Cell><Data ss:Type=\"String\">" . htmlspecialchars($header) . "</Data></Cell>\n";
+        }
+        echo "</Row>\n";
+        
+        // Data rows
+        foreach ($report_data as $data_row) {
+            echo "<Row>\n";
+            if ($user_role === 'veo') {
+                $values = [$data_row['resident_name'], $data_row['house_no'], $data_row['gender'], 
+                          $data_row['date_of_birth'], $data_row['nida_number'], $data_row['phone'],
+                          $data_row['occupation'], $data_row['ownership'], $data_row['education_level'],
+                          $data_row['employment_status'], $data_row['family_member_count']];
+            } else {
+                $values = [$data_row['village_name'] ?? $data_row['ward_name'], 
+                          $data_row['residence_count'], $data_row['family_member_count']];
+            }
+            
+            foreach ($values as $value) {
+                echo "<Cell><Data ss:Type=\"String\">" . htmlspecialchars($value) . "</Data></Cell>\n";
+            }
+            echo "</Row>\n";
+        }
+        
+        echo "</Table>\n";
+        echo "</Worksheet>\n";
+        echo "</Workbook>\n";
+        exit();
+        
+    } elseif ($export_format === 'csv') {
+        // Generate CSV report
+        $filename = 'residence_report_' . date('Y-m-d_H-i-s') . '.csv';
+        
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        $output = fopen('php://output', 'w');
+        
+        // CSV headers
+        if ($user_role === 'veo') {
+            fputcsv($output, ['Resident Name', 'House No', 'Gender', 'Date of Birth', 'NIDA Number', 
+                             'Phone', 'Occupation', 'Ownership', 'Education Level', 'Employment Status', 'Family Members']);
+        } else {
+            fputcsv($output, ['Location', 'Residences', 'Family Members']);
+        }
+        
+        // Data rows
+        foreach ($report_data as $data_row) {
+            if ($user_role === 'veo') {
+                fputcsv($output, [$data_row['resident_name'], $data_row['house_no'], $data_row['gender'], 
+                                $data_row['date_of_birth'], $data_row['nida_number'], $data_row['phone'],
+                                $data_row['occupation'], $data_row['ownership'], $data_row['education_level'],
+                                $data_row['employment_status'], $data_row['family_member_count']]);
+            } else {
+                fputcsv($output, [$data_row['village_name'] ?? $data_row['ward_name'], 
+                                $data_row['residence_count'], $data_row['family_member_count']]);
+            }
+        }
+        
+        fclose($output);
+        exit();
+    }
 }
 
 include 'includes/header.php';
 ?>
 
-<div class="space-y-6">
-    <h1 class="text-2xl font-bold text-gray-800">System Reports</h1>
-    
-    <?php if ($error): ?>
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded alert">
-            <i class="fas fa-exclamation-circle mr-2"></i>
-            <?php echo $error; ?>
-        </div>
-    <?php endif; ?>
-    
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                    <i class="fas fa-users text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Total Users</p>
-                    <p class="text-2xl font-bold text-gray-900">
-                        <?php echo array_sum(array_column($users_by_role, 'count')); ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600">
-                    <i class="fas fa-building text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Total Residences</p>
-                    <p class="text-2xl font-bold text-gray-900">
-                        <?php echo array_sum(array_column($residences_by_status, 'count')); ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                    <i class="fas fa-chart-line text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">This Month</p>
-                    <p class="text-2xl font-bold text-gray-900">
-                        <?php 
-                        $current_month = date('Y-m');
-                        $this_month = array_filter($monthly_registrations, function($item) use ($current_month) {
-                            return $item['month'] === $current_month;
-                        });
-                        echo !empty($this_month) ? reset($this_month)['count'] : 0;
-                        ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <i class="fas fa-check-circle text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Active Residences</p>
-                    <p class="text-2xl font-bold text-gray-900">
-                        <?php 
-                        $active = array_filter($residences_by_status, function($item) {
-                            return $item['status'] === 'active';
-                        });
-                        echo !empty($active) ? reset($active)['count'] : 0;
-                        ?>
-                    </p>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <h4 class="page-title">Reports</h4>
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Reports</li>
+                    </ol>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Users by Role -->
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Users by Role</h3>
-            <div class="space-y-3">
-                <?php foreach ($users_by_role as $role_data): ?>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-700">
-                        <?php echo getRoleDisplayName($role_data['role']); ?>
-                    </span>
-                    <div class="flex items-center">
-                        <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: <?php echo ($role_data['count'] / array_sum(array_column($users_by_role, 'count'))) * 100; ?>%"></div>
-                        </div>
-                        <span class="text-sm font-bold text-gray-900"><?php echo $role_data['count']; ?></span>
-                    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title"><?php echo $report_title; ?></h4>
+                    <p class="text-muted"><?php echo $report_subtitle; ?></p>
                 </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        
-        <!-- Residences by Status -->
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Residences by Status</h3>
-            <div class="space-y-3">
-                <?php foreach ($residences_by_status as $status_data): ?>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-700">
-                        <?php echo ucfirst($status_data['status']); ?>
-                    </span>
-                    <div class="flex items-center">
-                        <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: <?php echo ($status_data['count'] / array_sum(array_column($residences_by_status, 'count'))) * 100; ?>%"></div>
+                <div class="card-body">
+                    <?php if (isset($error_message)): ?>
+                        <div class="alert alert-danger">
+                            <?php echo $error_message; ?>
                         </div>
-                        <span class="text-sm font-bold text-gray-900"><?php echo $status_data['count']; ?></span>
-                    </div>
+                    <?php else: ?>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h5>Export Options</h5>
+                                <div class="btn-group" role="group">
+                                    <a href="?export=pdf" class="btn btn-danger">
+                                        <i class="mdi mdi-file-pdf"></i> Export PDF
+                                    </a>
+                                    <a href="?export=excel" class="btn btn-success">
+                                        <i class="mdi mdi-file-excel"></i> Export Excel
+                                    </a>
+                                    <a href="?export=csv" class="btn btn-info">
+                                        <i class="mdi mdi-file-csv"></i> Export CSV
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <p class="text-muted">
+                                    <strong>Generated on:</strong> <?php echo date('Y-m-d H:i:s'); ?><br>
+                                    <strong>Generated by:</strong> <?php echo $_SESSION['username']; ?> (<?php echo getRoleDisplayName($user_role); ?>)
+                                </p>
+                            </div>
+                        </div>
+
+                        <?php if (!empty($report_data)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <?php if ($user_role === 'veo'): ?>
+                                                <th>Resident Name</th>
+                                                <th>House No</th>
+                                                <th>Gender</th>
+                                                <th>Date of Birth</th>
+                                                <th>NIDA Number</th>
+                                                <th>Phone</th>
+                                                <th>Occupation</th>
+                                                <th>Ownership</th>
+                                                <th>Education Level</th>
+                                                <th>Employment Status</th>
+                                                <th>Family Members</th>
+                                            <?php else: ?>
+                                                <th>Location</th>
+                                                <th>Residences</th>
+                                                <th>Family Members</th>
+                                            <?php endif; ?>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($report_data as $row): ?>
+                                            <tr>
+                                                <?php if ($user_role === 'veo'): ?>
+                                                    <td><?php echo htmlspecialchars($row['resident_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['house_no']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['gender']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['date_of_birth']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['nida_number']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['phone']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['occupation']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['ownership']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['education_level']); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['employment_status']); ?></td>
+                                                    <td><?php echo $row['family_member_count']; ?></td>
+                                                <?php else: ?>
+                                                    <td><?php echo htmlspecialchars($row['village_name'] ?? $row['ward_name']); ?></td>
+                                                    <td><?php echo $row['residence_count']; ?></td>
+                                                    <td><?php echo $row['family_member_count']; ?></td>
+                                                <?php endif; ?>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <h5>No Data Available</h5>
+                                <p>No data found for the selected criteria. This could be because:</p>
+                                <ul>
+                                    <li>No residences have been registered yet</li>
+                                    <li>No data matches your current role and location assignment</li>
+                                    <li>There was an error retrieving the data</li>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </div>
-                <?php endforeach; ?>
             </div>
-        </div>
-    </div>
-    
-    <!-- Top Users -->
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Registering Users</h3>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <?php foreach ($top_users as $user): ?>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            <?php echo htmlspecialchars($user['full_name']); ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                <?php echo getRoleDisplayName($user['role']); ?>
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo $user['total_registrations']; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
         </div>
     </div>
 </div>

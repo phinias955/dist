@@ -93,7 +93,7 @@ if (!isset($page_title)) {
                     
                     <?php if (canAccessPage('reports')): ?>
                     <li>
-                        <a href="reports.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                        <a href="reports_dashboard.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo in_array(basename($_SERVER['PHP_SELF']), ['reports_dashboard.php', 'reports.php', 'detailed_residence_report.php', 'family_members_report.php', 'transfer_report.php', 'statistics_report.php']) ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-chart-bar mr-3"></i>
                             Reports
                         </a>
