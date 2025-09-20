@@ -97,6 +97,20 @@ if (!isset($page_title)) {
                     </li>
                     <?php endif; ?>
                     
+                    <li>
+                        <a href="transfer_approvals.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'transfer_approvals.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                            <i class="fas fa-exchange-alt mr-3"></i>
+                            Transfer Approvals
+                        </a>
+                    </li>
+                    
+                    <li>
+                        <a href="transfer_status.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'transfer_status.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
+                            <i class="fas fa-chart-line mr-3"></i>
+                            Transfer Status
+                        </a>
+                    </li>
+                    
                     <?php if (canManagePermissions()): ?>
                     <li>
                         <a href="permissions.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'permissions.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">

@@ -219,10 +219,14 @@ include 'includes/header.php';
                                    class="text-green-600 hover:text-green-900" title="Edit Residence">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="family_members.php?id=<?php echo $residence['id']; ?>" 
-                                   class="text-purple-600 hover:text-purple-900" title="Manage Family Members">
-                                    <i class="fas fa-users"></i>
-                                </a>
+                <a href="family_members.php?id=<?php echo $residence['id']; ?>"
+                   class="text-purple-600 hover:text-purple-900" title="Manage Family Members">
+                    <i class="fas fa-users"></i>
+                </a>
+                <a href="transfer_residence.php?id=<?php echo $residence['id']; ?>"
+                   class="text-orange-600 hover:text-orange-900" title="Transfer Residence">
+                    <i class="fas fa-exchange-alt"></i>
+                </a>
                                 <?php if ($residence['status'] === 'active'): ?>
                                     <a href="?delete=<?php echo $residence['id']; ?>" 
                                        class="text-red-600 hover:text-red-900" title="Deactivate Residence"

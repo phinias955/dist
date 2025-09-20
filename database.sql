@@ -213,6 +213,41 @@ INSERT INTO residences (house_no, resident_name, gender, date_of_birth, nida_num
 ('H002', 'Mary Kimaro', 'female', '1990-07-22', '12345678901234567891', '0723456789', 'mary@email.com', 'Nurse', 'tenant', 2, 'diploma', 'employed', 1, 1, 1),
 ('H003', 'Peter Mwangi', 'male', '1978-12-10', '12345678901234567892', '0734567890', 'peter@email.com', 'Farmer', 'owner', 4, 'secondary', 'self_employed', 2, 3, 1);
 
+-- Residence transfers table for managing transfer requests and approvals
+CREATE TABLE residence_transfers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    residence_id INT NOT NULL,
+    from_ward_id INT NOT NULL,
+    from_village_id INT NOT NULL,
+    to_ward_id INT NOT NULL,
+    to_village_id INT NOT NULL,
+    transfer_type ENUM('veo', 'ward_admin', 'super_admin') NOT NULL,
+    transfer_reason TEXT NOT NULL,
+    requested_by INT NOT NULL,
+    status ENUM('pending_approval', 'weo_approved', 'ward_approved', 'veo_accepted', 'completed', 'rejected') DEFAULT 'pending_approval',
+    weo_approved_by INT NULL,
+    weo_approved_at TIMESTAMP NULL,
+    ward_approved_by INT NULL,
+    ward_approved_at TIMESTAMP NULL,
+    veo_accepted_by INT NULL,
+    veo_accepted_at TIMESTAMP NULL,
+    rejected_by INT NULL,
+    rejected_at TIMESTAMP NULL,
+    rejection_reason TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (residence_id) REFERENCES residences(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_ward_id) REFERENCES wards(id),
+    FOREIGN KEY (from_village_id) REFERENCES villages(id),
+    FOREIGN KEY (to_ward_id) REFERENCES wards(id),
+    FOREIGN KEY (to_village_id) REFERENCES villages(id),
+    FOREIGN KEY (requested_by) REFERENCES users(id),
+    FOREIGN KEY (weo_approved_by) REFERENCES users(id),
+    FOREIGN KEY (ward_approved_by) REFERENCES users(id),
+    FOREIGN KEY (veo_accepted_by) REFERENCES users(id),
+    FOREIGN KEY (rejected_by) REFERENCES users(id)
+);
+
 -- Now add foreign key constraints for created_by fields
 ALTER TABLE wards ADD FOREIGN KEY (created_by) REFERENCES users(id);
 ALTER TABLE villages ADD FOREIGN KEY (created_by) REFERENCES users(id);
