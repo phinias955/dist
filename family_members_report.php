@@ -35,7 +35,7 @@ try {
         $report_title = 'Family Members Report - System Wide';
         $report_subtitle = 'All Wards and Villages';
         
-        // Get comprehensive statistics
+        // Get  statistics
         $stats_query = "
             SELECT 
                 COUNT(DISTINCT fm.id) as total_family_members,

@@ -864,4 +864,218 @@ function validateFormData($data, $required_fields = []) {
     ];
 }
 
+// Bin Management Functions
+function moveUserToBin($user_id, $deleted_by, $deletion_reason = 'deleted') {
+    global $pdo;
+    
+    try {
+        // Get user data
+        $stmt = $pdo->prepare("
+            SELECT u.*, w.ward_name, v.village_name 
+            FROM users u
+            LEFT JOIN wards w ON u.assigned_ward_id = w.id
+            LEFT JOIN villages v ON u.assigned_village_id = v.id
+            WHERE u.id = ?
+        ");
+        $stmt->execute([$user_id]);
+        $user_data = $stmt->fetch();
+        
+        if ($user_data) {
+            // Insert into bin_users
+            $stmt = $pdo->prepare("
+                INSERT INTO bin_users (original_user_id, full_name, username, password, role, nida_number, 
+                                     assigned_ward_id, assigned_village_id, original_created_at, deleted_by, 
+                                     deletion_reason, ward_name, village_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $user_data['id'],
+                $user_data['full_name'],
+                $user_data['username'],
+                $user_data['password'],
+                $user_data['role'],
+                $user_data['nida_number'],
+                $user_data['assigned_ward_id'],
+                $user_data['assigned_village_id'],
+                $user_data['created_at'],
+                $deleted_by,
+                $deletion_reason,
+                $user_data['ward_name'],
+                $user_data['village_name']
+            ]);
+            
+            // Delete from users table
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$user_id]);
+            
+            return true;
+        }
+        return false;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function moveResidenceToBin($residence_id, $deleted_by, $deletion_reason = 'deleted') {
+    global $pdo;
+    
+    try {
+        // Get residence data
+        $stmt = $pdo->prepare("
+            SELECT r.*, w.ward_name, v.village_name 
+            FROM residences r
+            LEFT JOIN wards w ON r.ward_id = w.id
+            LEFT JOIN villages v ON r.village_id = v.id
+            WHERE r.id = ?
+        ");
+        $stmt->execute([$residence_id]);
+        $residence_data = $stmt->fetch();
+        
+        if ($residence_data) {
+            // Insert into bin_residences
+            $stmt = $pdo->prepare("
+                INSERT INTO bin_residences (original_residence_id, house_no, resident_name, gender, date_of_birth, 
+                                          nida_number, phone, email, occupation, ownership, family_members, 
+                                          education_level, employment_status, ward_id, village_id, registered_by, 
+                                          original_registered_at, deleted_by, deletion_reason, ward_name, village_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $residence_data['id'],
+                $residence_data['house_no'],
+                $residence_data['resident_name'],
+                $residence_data['gender'],
+                $residence_data['date_of_birth'],
+                $residence_data['nida_number'],
+                $residence_data['phone'],
+                $residence_data['email'],
+                $residence_data['occupation'],
+                $residence_data['ownership'],
+                $residence_data['family_members'],
+                $residence_data['education_level'],
+                $residence_data['employment_status'],
+                $residence_data['ward_id'],
+                $residence_data['village_id'],
+                $residence_data['registered_by'],
+                $residence_data['registered_at'],
+                $deleted_by,
+                $deletion_reason,
+                $residence_data['ward_name'],
+                $residence_data['village_name']
+            ]);
+            
+            // Move family members to bin
+            $stmt = $pdo->prepare("
+                SELECT fm.*, r.house_no, w.ward_name, v.village_name
+                FROM family_members fm
+                JOIN residences r ON fm.residence_id = r.id
+                LEFT JOIN wards w ON r.ward_id = w.id
+                LEFT JOIN villages v ON r.village_id = v.id
+                WHERE fm.residence_id = ?
+            ");
+            $stmt->execute([$residence_id]);
+            $family_members = $stmt->fetchAll();
+            
+            foreach ($family_members as $member) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO bin_family_members (original_family_member_id, original_residence_id, name, gender, 
+                                                   date_of_birth, nida_number, relationship, is_minor, phone, email, 
+                                                   occupation, education_level, employment_status, original_created_at, 
+                                                   deleted_by, deletion_reason, residence_house_no, ward_name, village_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $member['id'],
+                    $member['residence_id'],
+                    $member['name'],
+                    $member['gender'],
+                    $member['date_of_birth'],
+                    $member['nida_number'],
+                    $member['relationship'],
+                    $member['is_minor'],
+                    $member['phone'],
+                    $member['email'],
+                    $member['occupation'],
+                    $member['education_level'],
+                    $member['employment_status'],
+                    $member['created_at'],
+                    $deleted_by,
+                    'residence_deleted',
+                    $member['house_no'],
+                    $member['ward_name'],
+                    $member['village_name']
+                ]);
+            }
+            
+            // Delete from residences table (this will cascade delete family members)
+            $stmt = $pdo->prepare("DELETE FROM residences WHERE id = ?");
+            $stmt->execute([$residence_id]);
+            
+            return true;
+        }
+        return false;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function moveFamilyMemberToBin($family_member_id, $deleted_by, $deletion_reason = 'deleted') {
+    global $pdo;
+    
+    try {
+        // Get family member data
+        $stmt = $pdo->prepare("
+            SELECT fm.*, r.house_no, w.ward_name, v.village_name
+            FROM family_members fm
+            JOIN residences r ON fm.residence_id = r.id
+            LEFT JOIN wards w ON r.ward_id = w.id
+            LEFT JOIN villages v ON r.village_id = v.id
+            WHERE fm.id = ?
+        ");
+        $stmt->execute([$family_member_id]);
+        $member_data = $stmt->fetch();
+        
+        if ($member_data) {
+            // Insert into bin_family_members
+            $stmt = $pdo->prepare("
+                INSERT INTO bin_family_members (original_family_member_id, original_residence_id, name, gender, 
+                                               date_of_birth, nida_number, relationship, is_minor, phone, email, 
+                                               occupation, education_level, employment_status, original_created_at, 
+                                               deleted_by, deletion_reason, residence_house_no, ward_name, village_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $member_data['id'],
+                $member_data['residence_id'],
+                $member_data['name'],
+                $member_data['gender'],
+                $member_data['date_of_birth'],
+                $member_data['nida_number'],
+                $member_data['relationship'],
+                $member_data['is_minor'],
+                $member_data['phone'],
+                $member_data['email'],
+                $member_data['occupation'],
+                $member_data['education_level'],
+                $member_data['employment_status'],
+                $member_data['created_at'],
+                $deleted_by,
+                $deletion_reason,
+                $member_data['house_no'],
+                $member_data['ward_name'],
+                $member_data['village_name']
+            ]);
+            
+            // Delete from family_members table
+            $stmt = $pdo->prepare("DELETE FROM family_members WHERE id = ?");
+            $stmt->execute([$family_member_id]);
+            
+            return true;
+        }
+        return false;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
 ?>

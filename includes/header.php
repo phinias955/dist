@@ -27,8 +27,8 @@ if (!isset($page_title)) {
 <body class="bg-gray-100">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div class="bg-white shadow-lg w-64 min-h-screen">
-            <div class="p-6 border-b">
+        <div id="sidebar" class="bg-white shadow-lg w-64 h-screen flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out fixed lg:static z-50">
+            <div class="p-6 border-b flex-shrink-0">
                 <div class="flex items-center">
                     <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                         <i class="fas fa-home text-white"></i>
@@ -41,7 +41,7 @@ if (!isset($page_title)) {
             </div>
             
             <!-- User Info -->
-            <div class="p-4 border-b bg-gray-50">
+            <div class="p-4 border-b bg-gray-50 flex-shrink-0">
                 <div class="flex items-center">
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
                         <i class="fas fa-user text-gray-600"></i>
@@ -53,10 +53,9 @@ if (!isset($page_title)) {
                 </div>
             </div>
             
-            
             <!-- Navigation Menu -->
-            <nav class="mt-4">
-                <ul class="space-y-1 px-4">
+            <nav class="flex-1 overflow-y-auto">
+                <ul class="space-y-1 px-4 py-4">
                     <li>
                         <a href="dashboard.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'bg-blue-50 text-blue-700' : ''; ?>">
                             <i class="fas fa-tachometer-alt mr-3"></i>
@@ -76,6 +75,12 @@ if (!isset($page_title)) {
                         <a href="deleted_users.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'deleted_users.php' ? 'bg-red-50 text-red-700' : ''; ?>">
                             <i class="fas fa-user-times mr-3"></i>
                             Deleted Users
+                        </a>
+                    </li>
+                    <li>
+                        <a href="bin_management.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-700 transition duration-200 <?php echo in_array(basename($_SERVER['PHP_SELF']), ['bin_management.php', 'bin_users.php', 'bin_residences.php', 'bin_family_members.php', 'bin_locations.php']) ? 'bg-orange-50 text-orange-700' : ''; ?>">
+                            <i class="fas fa-trash-alt mr-3"></i>
+                            Bin Management
                         </a>
                     </li>
                     <?php endif; ?>
@@ -202,9 +207,15 @@ if (!isset($page_title)) {
             <!-- Top Bar -->
             <header class="bg-white shadow-sm border-b px-6 py-4">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-semibold text-gray-800"><?php echo $page_title; ?></h2>
+                    <div class="flex items-center">
+                        <!-- Mobile menu button -->
+                        <button id="mobile-menu-button" class="lg:hidden mr-4 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <h2 class="text-xl font-semibold text-gray-800"><?php echo $page_title; ?></h2>
+                    </div>
                     <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-600">
+                        <span class="text-sm text-gray-600 hidden sm:block">
                             <i class="fas fa-calendar mr-1"></i>
                             <?php echo date('M d, Y'); ?>
                         </span>
@@ -215,5 +226,10 @@ if (!isset($page_title)) {
                 </div>
             </header>
             
+            <!-- Mobile menu overlay -->
+            <div id="mobile-menu-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden hidden"></div>
+            
             <!-- Page Content -->
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+ 
+ 
