@@ -773,6 +773,229 @@ include 'includes/header.php';
             color: var(--secondary);
         }
 
+        /* Statistics Overview */
+        .stats-overview {
+            margin-bottom: 32px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--box-shadow);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: var(--transition);
+            border-left: 4px solid;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-card.primary {
+            border-left-color: var(--primary);
+        }
+
+        .stat-card.success {
+            border-left-color: var(--success);
+        }
+
+        .stat-card.info {
+            border-left-color: var(--info);
+        }
+
+        .stat-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+
+        .stat-card.primary .stat-icon {
+            background: linear-gradient(135deg, var(--primary), #5e72e4);
+        }
+
+        .stat-card.success .stat-icon {
+            background: linear-gradient(135deg, var(--success), #20c997);
+        }
+
+        .stat-card.info .stat-icon {
+            background: linear-gradient(135deg, var(--info), #17a2b8);
+        }
+
+        .stat-card.warning .stat-icon {
+            background: linear-gradient(135deg, var(--warning), #fd7e14);
+        }
+
+        .stat-content h3 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+            color: var(--gray-800);
+        }
+
+        .stat-content p {
+            font-size: 14px;
+            color: var(--gray-600);
+            margin: 0;
+            font-weight: 500;
+        }
+
+        /* Distribution Sections */
+        .distribution-section {
+            margin-bottom: 32px;
+        }
+
+        .distribution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+
+        .distribution-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .distribution-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+
+        .distribution-card .card-header {
+            background: linear-gradient(135deg, var(--gray-800), var(--gray-700));
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .distribution-card .card-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .distribution-card .card-body {
+            padding: 0;
+        }
+
+        .modern-table-container {
+            overflow-x: auto;
+        }
+
+        .count-badge {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .percentage-bar {
+            position: relative;
+            background: var(--gray-200);
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            min-width: 100px;
+        }
+
+        .percentage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #5e72e4);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .percentage-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
+        /* Charts Section */
+        .charts-section {
+            margin-bottom: 32px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .chart-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-header {
+            background: linear-gradient(135deg, var(--gray-800), var(--gray-700));
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .chart-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chart-body {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+
+        .chart-body canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .dashboard-container {
@@ -873,271 +1096,155 @@ include 'includes/header.php';
                             </div>
                         </div>
 
-                        <!-- Basic Statistics Cards -->
-                        <div class="row mb-4">
-                            <div class="col-md-3">
-                                <div class="card text-center">
-                                    <div class="card-body">
-                                        <h3 class="text-primary"><?php echo $stats_data['total_residences'] ?? 0; ?></h3>
-                                        <p class="text-muted">Total Residences</p>
+                        <!-- Statistics Overview Cards -->
+                        <div class="stats-overview fade-in">
+                            <div class="stats-grid">
+                                <div class="stat-card primary">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-home"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3><?php echo $stats_data['total_residences'] ?? 0; ?></h3>
+                                        <p>Total Residences</p>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card text-center">
-                                    <div class="card-body">
-                                        <h3 class="text-success"><?php echo $stats_data['total_family_members'] ?? 0; ?></h3>
-                                        <p class="text-muted">Total Family Members</p>
+                                
+                                <div class="stat-card success">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3><?php echo $stats_data['total_family_members'] ?? 0; ?></h3>
+                                        <p>Family Members</p>
                                     </div>
                                 </div>
-                            </div>
-                            <?php if (isset($stats_data['total_wards'])): ?>
-                            <div class="col-md-3">
-                                <div class="card text-center">
-                                    <div class="card-body">
-                                        <h3 class="text-info"><?php echo $stats_data['total_wards']; ?></h3>
-                                        <p class="text-muted">Total Wards</p>
+                                
+                                <?php if (isset($stats_data['total_wards'])): ?>
+                                <div class="stat-card info">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3><?php echo $stats_data['total_wards']; ?></h3>
+                                        <p>Total Wards</p>
                                     </div>
                                 </div>
-                            </div>
-                            <?php endif; ?>
-                            <?php if (isset($stats_data['total_villages'])): ?>
-                            <div class="col-md-3">
-                                <div class="card text-center">
-                                    <div class="card-body">
-                                        <h3 class="text-warning"><?php echo $stats_data['total_villages']; ?></h3>
-                                        <p class="text-muted">Total Villages</p>
+                                <?php endif; ?>
+                                
+                                <?php if (isset($stats_data['total_villages'])): ?>
+                                <div class="stat-card warning">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-building"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3><?php echo $stats_data['total_villages']; ?></h3>
+                                        <p>Total Villages</p>
                                     </div>
                                 </div>
+                                <?php endif; ?>
                             </div>
-                            <?php endif; ?>
                         </div>
 
-                        <!-- Gender Distribution -->
-                        <?php if (!empty($stats_data['gender_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Gender Distribution</h5>
+                        <!-- Charts Section -->
+                        <div class="charts-section fade-in">
+                            <div class="charts-grid">
+                                <!-- Gender Distribution Chart -->
+                                <?php if (!empty($stats_data['gender_distribution'])): ?>
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-venus-mars"></i>
+                                            Gender Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Gender</th>
-                                                        <th>Count</th>
-                                                        <th>Percentage</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php 
-                                                    $total_gender = array_sum(array_column($stats_data['gender_distribution'], 'count'));
-                                                    foreach ($stats_data['gender_distribution'] as $row): 
-                                                        $percentage = $total_gender > 0 ? round(($row['count'] / $total_gender) * 100, 2) : 0;
-                                                    ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['gender']); ?></td>
-                                                        <td><?php echo $row['count']; ?></td>
-                                                        <td><?php echo $percentage; ?>%</td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="genderChart" width="400" height="300"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
 
-                        <!-- Ownership Distribution -->
-                        <?php if (!empty($stats_data['ownership_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Ownership Distribution</h5>
+                                <!-- Ownership Distribution Chart -->
+                                <?php if (!empty($stats_data['ownership_distribution'])): ?>
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-key"></i>
+                                            Ownership Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ownership</th>
-                                                        <th>Count</th>
-                                                        <th>Percentage</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php 
-                                                    $total_ownership = array_sum(array_column($stats_data['ownership_distribution'], 'count'));
-                                                    foreach ($stats_data['ownership_distribution'] as $row): 
-                                                        $percentage = $total_ownership > 0 ? round(($row['count'] / $total_ownership) * 100, 2) : 0;
-                                                    ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['ownership']); ?></td>
-                                                        <td><?php echo $row['count']; ?></td>
-                                                        <td><?php echo $percentage; ?>%</td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="ownershipChart" width="400" height="300"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
 
-                        <!-- Education Distribution -->
-                        <?php if (!empty($stats_data['education_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Education Level Distribution</h5>
+                                <!-- Education Distribution Chart -->
+                                <?php if (!empty($stats_data['education_distribution'])): ?>
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-graduation-cap"></i>
+                                            Education Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Education Level</th>
-                                                        <th>Count</th>
-                                                        <th>Percentage</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php 
-                                                    $total_education = array_sum(array_column($stats_data['education_distribution'], 'count'));
-                                                    foreach ($stats_data['education_distribution'] as $row): 
-                                                        $percentage = $total_education > 0 ? round(($row['count'] / $total_education) * 100, 2) : 0;
-                                                    ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['education_level']); ?></td>
-                                                        <td><?php echo $row['count']; ?></td>
-                                                        <td><?php echo $percentage; ?>%</td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="educationChart" width="400" height="300"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
 
-                        <!-- Employment Distribution -->
-                        <?php if (!empty($stats_data['employment_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Employment Status Distribution</h5>
+                                <!-- Employment Distribution Chart -->
+                                <?php if (!empty($stats_data['employment_distribution'])): ?>
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-briefcase"></i>
+                                            Employment Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Employment Status</th>
-                                                        <th>Count</th>
-                                                        <th>Percentage</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php 
-                                                    $total_employment = array_sum(array_column($stats_data['employment_distribution'], 'count'));
-                                                    foreach ($stats_data['employment_distribution'] as $row): 
-                                                        $percentage = $total_employment > 0 ? round(($row['count'] / $total_employment) * 100, 2) : 0;
-                                                    ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['employment_status']); ?></td>
-                                                        <td><?php echo $row['count']; ?></td>
-                                                        <td><?php echo $percentage; ?>%</td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="employmentChart" width="400" height="300"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
 
-                        <!-- Ward Distribution -->
-                        <?php if (!empty($stats_data['ward_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Ward Distribution</h5>
+                                <!-- Ward Distribution Chart -->
+                                <?php if (!empty($stats_data['ward_distribution'])): ?>
+                                <div class="chart-card full-width">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-map-marker-alt"></i>
+                                            Ward Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-striped">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ward</th>
-                                                        <th>Residences</th>
-                                                        <th>Family Members</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php foreach ($stats_data['ward_distribution'] as $row): ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['ward_name']); ?></td>
-                                                        <td><?php echo $row['residence_count']; ?></td>
-                                                        <td><?php echo $row['family_count']; ?></td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="wardChart" width="800" height="400"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
 
-                        <!-- Village Distribution -->
-                        <?php if (!empty($stats_data['village_distribution'])): ?>
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">Village Distribution</h5>
+                                <!-- Village Distribution Chart -->
+                                <?php if (!empty($stats_data['village_distribution'])): ?>
+                                <div class="chart-card full-width">
+                                    <div class="chart-header">
+                                        <h3>
+                                            <i class="fas fa-building"></i>
+                                            Village Distribution
+                                        </h3>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-striped">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Village</th>
-                                                        <th>Residences</th>
-                                                        <th>Family Members</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php foreach ($stats_data['village_distribution'] as $row): ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($row['village_name']); ?></td>
-                                                        <td><?php echo $row['residence_count']; ?></td>
-                                                        <td><?php echo $row['family_count']; ?></td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div class="chart-body">
+                                        <canvas id="villageChart" width="800" height="400"></canvas>
                                     </div>
                                 </div>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <?php endif; ?>
+
+
+
+
+
+
 
                     <?php endif; ?>
                 </div>
@@ -1147,3 +1254,350 @@ include 'includes/header.php';
 </div>
 
 <?php include 'includes/footer.php'; ?>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart.js configuration
+    Chart.defaults.font.family = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#6c757d';
+
+    // Color palette for charts
+    const colors = {
+        primary: '#007bff',
+        success: '#28a745',
+        info: '#17a2b8',
+        warning: '#ffc107',
+        danger: '#dc3545',
+        secondary: '#6c757d',
+        light: '#f8f9fa',
+        dark: '#343a40'
+    };
+
+    const chartColors = [
+        '#007bff', '#28a745', '#ffc107', '#dc3545', '#17a2b8', 
+        '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6c757d'
+    ];
+
+    // Gender Distribution Chart
+    <?php if (!empty($stats_data['gender_distribution'])): ?>
+    const genderCtx = document.getElementById('genderChart');
+    if (genderCtx) {
+        const genderData = <?php echo json_encode($stats_data['gender_distribution']); ?>;
+        new Chart(genderCtx, {
+            type: 'doughnut',
+            data: {
+                labels: genderData.map(item => item.gender),
+                datasets: [{
+                    data: genderData.map(item => item.count),
+                    backgroundColor: ['#007bff', '#ffc107'],
+                    borderColor: ['#0056b3', '#e0a800'],
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 2000
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+
+    // Ownership Distribution Chart
+    <?php if (!empty($stats_data['ownership_distribution'])): ?>
+    const ownershipCtx = document.getElementById('ownershipChart');
+    if (ownershipCtx) {
+        const ownershipData = <?php echo json_encode($stats_data['ownership_distribution']); ?>;
+        new Chart(ownershipCtx, {
+            type: 'pie',
+            data: {
+                labels: ownershipData.map(item => item.ownership),
+                datasets: [{
+                    data: ownershipData.map(item => item.count),
+                    backgroundColor: ['#28a745', '#6c757d'],
+                    borderColor: ['#1e7e34', '#495057'],
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 2000
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+
+    // Education Distribution Chart
+    <?php if (!empty($stats_data['education_distribution'])): ?>
+    const educationCtx = document.getElementById('educationChart');
+    if (educationCtx) {
+        const educationData = <?php echo json_encode($stats_data['education_distribution']); ?>;
+        new Chart(educationCtx, {
+            type: 'doughnut',
+            data: {
+                labels: educationData.map(item => item.education_level),
+                datasets: [{
+                    data: educationData.map(item => item.count),
+                    backgroundColor: chartColors.slice(0, educationData.length),
+                    borderColor: chartColors.slice(0, educationData.length).map(color => color + '80'),
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 2000
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+
+    // Employment Distribution Chart
+    <?php if (!empty($stats_data['employment_distribution'])): ?>
+    const employmentCtx = document.getElementById('employmentChart');
+    if (employmentCtx) {
+        const employmentData = <?php echo json_encode($stats_data['employment_distribution']); ?>;
+        new Chart(employmentCtx, {
+            type: 'pie',
+            data: {
+                labels: employmentData.map(item => item.employment_status),
+                datasets: [{
+                    data: employmentData.map(item => item.count),
+                    backgroundColor: ['#28a745', '#dc3545'],
+                    borderColor: ['#1e7e34', '#c82333'],
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 2000
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+
+    // Ward Distribution Chart
+    <?php if (!empty($stats_data['ward_distribution'])): ?>
+    const wardCtx = document.getElementById('wardChart');
+    if (wardCtx) {
+        const wardData = <?php echo json_encode($stats_data['ward_distribution']); ?>;
+        new Chart(wardCtx, {
+            type: 'bar',
+            data: {
+                labels: wardData.map(item => item.ward_name),
+                datasets: [{
+                    label: 'Residences',
+                    data: wardData.map(item => item.residence_count),
+                    backgroundColor: '#007bff',
+                    borderColor: '#0056b3',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }, {
+                    label: 'Family Members',
+                    data: wardData.map(item => item.family_count),
+                    backgroundColor: '#28a745',
+                    borderColor: '#1e7e34',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#f8f9fa'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+
+    // Village Distribution Chart
+    <?php if (!empty($stats_data['village_distribution'])): ?>
+    const villageCtx = document.getElementById('villageChart');
+    if (villageCtx) {
+        const villageData = <?php echo json_encode($stats_data['village_distribution']); ?>;
+        new Chart(villageCtx, {
+            type: 'bar',
+            data: {
+                labels: villageData.map(item => item.village_name),
+                datasets: [{
+                    label: 'Residences',
+                    data: villageData.map(item => item.residence_count),
+                    backgroundColor: '#17a2b8',
+                    borderColor: '#138496',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }, {
+                    label: 'Family Members',
+                    data: villageData.map(item => item.family_count),
+                    backgroundColor: '#ffc107',
+                    borderColor: '#e0a800',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#f8f9fa'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+    }
+    <?php endif; ?>
+});
+</script>
