@@ -71,6 +71,14 @@ if (!isset($page_title)) {
                             Manage Users
                         </a>
                     </li>
+                    <?php if (isSuperAdmin() || $_SESSION['user_role'] === 'admin'): ?>
+                    <li>
+                        <a href="deleted_users.php" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition duration-200 <?php echo basename($_SERVER['PHP_SELF']) == 'deleted_users.php' ? 'bg-red-50 text-red-700' : ''; ?>">
+                            <i class="fas fa-user-times mr-3"></i>
+                            Deleted Users
+                        </a>
+                    </li>
+                    <?php endif; ?>
                     <?php endif; ?>
                     
                     <?php if (canAccessPage('residences')): ?>

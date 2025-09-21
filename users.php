@@ -207,9 +207,16 @@ include 'includes/header.php';
             <?php endif; ?>
             <?php endif; ?>
         </div>
-        <a href="add_user.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
-            <i class="fas fa-plus mr-2"></i>Add New User
-        </a>
+        <div class="flex space-x-3">
+            <?php if (isSuperAdmin() || $_SESSION['user_role'] === 'admin'): ?>
+            <a href="deleted_users.php" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200">
+                <i class="fas fa-user-times mr-2"></i>Deleted Users
+            </a>
+            <?php endif; ?>
+            <a href="add_user.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                <i class="fas fa-plus mr-2"></i>Add New User
+            </a>
+        </div>
     </div>
     
     <!-- Messages -->

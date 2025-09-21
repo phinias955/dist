@@ -75,17 +75,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $residence) {
             $age = date_diff(date_create($date_of_birth), date_create('today'))->y;
         }
         
-        // Validation
-        if (empty($member_name)) {
-            $error = "Member name is required.";
-        } elseif (empty($relationship)) {
-            $error = "Relationship is required.";
-        } elseif (empty($gender)) {
-            $error = "Gender is required.";
-        } elseif (empty($date_of_birth)) {
-            $error = "Date of birth is required.";
-        } elseif ($age >= 18 && empty($nida_number)) {
-            $error = "NIDA number is required for members 18 years and above.";
+        // Validate form data
+        $required_fields = ['member_name', 'relationship', 'gender', 'date_of_birth'];
+        if ($age >= 18) {
+            $required_fields[] = 'nida_number';
+        }
+        
+        $validation = validateFormData($_POST, $required_fields);
+        
+        if (!$validation['valid']) {
+            $error = implode(', ', $validation['errors']);
         } elseif ($age >= 18 && empty($phone)) {
             $error = "Phone number is required for members 18 years and above.";
         } elseif ($age >= 18 && empty($occupation)) {
@@ -95,6 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $residence) {
         } elseif ($age >= 18 && empty($employment_status)) {
             $error = "Employment status is required for members 18 years and above.";
         } else {
+            // Use cleaned data
+            $nida_number = $validation['data']['nida_number'] ?? '';
+            $phone = $validation['data']['phone'] ?? '';
+            
             // Check if NIDA number already exists (for adults)
             if ($age >= 18 && !empty($nida_number)) {
                 try {
@@ -283,13 +286,15 @@ include 'includes/header.php';
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">NIDA Number *</label>
                             <input type="text" name="nida_number" value="<?php echo htmlspecialchars($_POST['nida_number'] ?? ''); ?>" 
-                                   class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                   class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   maxlength="20" placeholder="Enter 20-digit NIDA number">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
                             <input type="tel" name="phone" value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>" 
-                                   class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                   class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   maxlength="10" placeholder="Enter 10-digit phone number">
                         </div>
                     </div>
                     
@@ -426,5 +431,7 @@ document.querySelector('input[name="date_of_birth"]').addEventListener('change',
     }
 });
 </script>
+
+<script src="../js/validation.js"></script>
 
 <?php include 'includes/footer.php'; ?>

@@ -89,6 +89,31 @@ include 'includes/header.php';
         </div>
     <?php endif; ?>
     
+    <!-- Legend -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-blue-800 mb-2">
+            <i class="fas fa-info-circle mr-2"></i>Permission Indicators
+        </h3>
+        <div class="flex items-center space-x-6 text-sm text-blue-700">
+            <div class="flex items-center">
+                <span class="w-4 h-4 rounded-full bg-green-500 mr-2 flex items-center justify-center">
+                    <i class="fas fa-check text-xs text-white"></i>
+                </span>
+                <span>Active Permission</span>
+            </div>
+            <div class="flex items-center">
+                <span class="w-4 h-4 rounded-full bg-gray-300 mr-2 flex items-center justify-center">
+                    <i class="fas fa-times text-xs text-white opacity-0"></i>
+                </span>
+                <span>Inactive Permission</span>
+            </div>
+            <div class="flex items-center">
+                <div class="w-4 h-2 bg-green-500 rounded-full mr-2"></div>
+                <span>Permission Level (Progress Bar)</span>
+            </div>
+        </div>
+    </div>
+    
     <!-- Role Selection -->
     <div class="bg-white p-6 rounded-lg shadow-md">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">
@@ -109,9 +134,14 @@ include 'includes/header.php';
                         <p class="text-sm text-gray-500">
                             <?php 
                             $permission_count = count(array_filter($role_permissions[$role], function($p) { return $p['can_access']; }));
-                            echo $permission_count . ' permissions';
+                            echo $permission_count . ' active permissions';
                             ?>
                         </p>
+                        <div class="mt-1">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: <?php echo $permission_count > 0 ? min(100, ($permission_count / 20) * 100) : 0; ?>%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </button>
@@ -152,10 +182,12 @@ include 'includes/header.php';
                         $actions = getActionsByPage($page['id']);
                         foreach ($actions as $action): 
                         ?>
-                        <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded mb-2">
+                        <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded mb-2 hover:bg-gray-100 transition-colors">
                             <div class="flex items-center">
-                                <span class="w-3 h-3 rounded-full bg-gray-300 mr-3 action-indicator" 
-                                      id="indicator-<?php echo $page['id']; ?>-<?php echo $action['id']; ?>"></span>
+                                <span class="w-4 h-4 rounded-full bg-gray-300 mr-3 action-indicator flex items-center justify-center" 
+                                      id="indicator-<?php echo $page['id']; ?>-<?php echo $action['id']; ?>">
+                                    <i class="fas fa-times text-xs text-white opacity-0"></i>
+                                </span>
                                 <span class="text-sm font-medium text-gray-700"><?php echo $action['action_display_name']; ?></span>
                                 <span class="ml-2 text-xs text-gray-500">(<?php echo $action['action_type']; ?>)</span>
                             </div>
@@ -246,7 +278,11 @@ function loadRolePermissions(role) {
     if (rolePermissions[role]) {
         rolePermissions[role].forEach(permission => {
             if (permission.can_access) {
-                const checkbox = document.getElementById('perm-' + permission.page_name + '-' + permission.action_name);
+                // Use page_id and action_id from the database
+                const pageId = permission.page_id;
+                const actionId = permission.action_id;
+                const checkboxId = 'perm-' + pageId + '-' + actionId;
+                const checkbox = document.getElementById(checkboxId);
                 if (checkbox) {
                     checkbox.checked = true;
                     updateIndicator(checkbox);
@@ -260,13 +296,22 @@ function updateIndicator(checkbox) {
     const pageId = checkbox.dataset.page;
     const actionId = checkbox.dataset.action;
     const indicator = document.getElementById('indicator-' + pageId + '-' + actionId);
+    const icon = indicator.querySelector('i');
     
     if (checkbox.checked) {
         indicator.classList.remove('bg-gray-300');
         indicator.classList.add('bg-green-500');
+        if (icon) {
+            icon.classList.remove('fa-times', 'opacity-0');
+            icon.classList.add('fa-check', 'opacity-100');
+        }
     } else {
         indicator.classList.remove('bg-green-500');
         indicator.classList.add('bg-gray-300');
+        if (icon) {
+            icon.classList.remove('fa-check', 'opacity-100');
+            icon.classList.add('fa-times', 'opacity-0');
+        }
     }
 }
 
@@ -289,6 +334,23 @@ function selectNone() {
 function updateSelectedCount() {
     const selected = document.querySelectorAll('.permission-checkbox:checked').length;
     document.getElementById('selectedCount').textContent = selected;
+    
+    // Update the role tab with current count
+    const currentRole = document.getElementById('selectedRole').value;
+    const roleTab = document.getElementById('tab-' + currentRole);
+    if (roleTab) {
+        const countElement = roleTab.querySelector('.text-sm.text-gray-500');
+        if (countElement) {
+            countElement.textContent = selected + ' active permissions';
+        }
+        
+        // Update progress bar
+        const progressBar = roleTab.querySelector('.bg-green-500');
+        if (progressBar) {
+            const percentage = Math.min(100, (selected / 20) * 100);
+            progressBar.style.width = percentage + '%';
+        }
+    }
 }
 
 // Add event listeners

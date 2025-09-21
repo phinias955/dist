@@ -50,32 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ward_id = (int)($_POST['ward_id'] ?? 0);
     $village_id = (int)($_POST['village_id'] ?? 0);
     
-    // Validation
-    if (empty($resident_name)) {
-        $error = "Resident name is required.";
-    } elseif (empty($house_no)) {
-        $error = "House number is required.";
-    } elseif (empty($gender)) {
-        $error = "Gender is required.";
-    } elseif (empty($date_of_birth)) {
-        $error = "Date of birth is required.";
-    } elseif (empty($nida_number)) {
-        $error = "NIDA number is required.";
-    } elseif (empty($phone)) {
-        $error = "Phone number is required.";
-    } elseif (empty($occupation)) {
-        $error = "Occupation is required.";
-    } elseif (empty($ownership)) {
-        $error = "Ownership status is required.";
-    } elseif (empty($education_level)) {
-        $error = "Education level is required.";
-    } elseif (empty($employment_status)) {
-        $error = "Employment status is required.";
+    // Validate form data
+    $validation = validateFormData($_POST, ['resident_name', 'house_no', 'gender', 'date_of_birth', 'nida_number', 'phone', 'occupation', 'ownership', 'education_level', 'employment_status']);
+    
+    if (!$validation['valid']) {
+        $error = implode(', ', $validation['errors']);
     } elseif ($ward_id <= 0) {
         $error = "Please select a ward.";
     } elseif ($village_id <= 0) {
         $error = "Please select a village.";
     } else {
+        // Use cleaned data
+        $nida_number = $validation['data']['nida_number'];
+        $phone = $validation['data']['phone'];
+        
         // Check if NIDA number already exists
         try {
             $stmt = $pdo->prepare("SELECT id FROM residences WHERE nida_number = ? AND status = 'approved'");
@@ -181,13 +169,15 @@ include 'includes/header.php';
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">NIDA Number *</label>
                     <input type="text" name="nida_number" value="<?php echo htmlspecialchars($_POST['nida_number'] ?? ''); ?>" 
-                           class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                           class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required
+                           maxlength="20" placeholder="Enter 20-digit NIDA number">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
                     <input type="tel" name="phone" value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>" 
-                           class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                           class="input-mobile w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required
+                           maxlength="10" placeholder="Enter 10-digit phone number">
                 </div>
             </div>
         </div>
@@ -323,5 +313,7 @@ document.getElementById('ward_id').addEventListener('change', function() {
     }
 });
 </script>
+
+<script src="../js/validation.js"></script>
 
 <?php include 'includes/footer.php'; ?>

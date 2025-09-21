@@ -629,8 +629,8 @@ function getRolePermissions($role) {
         $stmt = $pdo->prepare("
             SELECT 
                 pm.module_name, pm.module_display_name, pm.module_icon,
-                pp.page_name, pp.page_display_name, pp.page_url, pp.page_icon,
-                pa.action_name, pa.action_display_name, pa.action_type,
+                pp.id as page_id, pp.page_name, pp.page_display_name, pp.page_url, pp.page_icon,
+                pa.id as action_id, pa.action_name, pa.action_display_name, pa.action_type,
                 rp.can_access
             FROM role_permissions rp
             JOIN permission_pages pp ON rp.page_id = pp.id
@@ -784,6 +784,84 @@ function getUserPermissionStatus($user_id, $page_name, $action_name = 'view') {
     } catch (PDOException $e) {
         return null;
     }
+}
+
+// Validation functions
+function validateNidaNumber($nida_number) {
+    // Remove any spaces or dashes
+    $nida_number = preg_replace('/[\s\-]/', '', $nida_number);
+    
+    // Check if it's exactly 20 digits
+    if (preg_match('/^\d{20}$/', $nida_number)) {
+        return [
+            'valid' => true,
+            'cleaned' => $nida_number,
+            'error' => null
+        ];
+    } else {
+        return [
+            'valid' => false,
+            'cleaned' => $nida_number,
+            'error' => 'NIDA number must be exactly 20 digits'
+        ];
+    }
+}
+
+function validatePhoneNumber($phone) {
+    // Remove any spaces, dashes, or plus signs
+    $phone = preg_replace('/[\s\-\+]/', '', $phone);
+    
+    // Check if it's exactly 10 digits
+    if (preg_match('/^\d{10}$/', $phone)) {
+        return [
+            'valid' => true,
+            'cleaned' => $phone,
+            'error' => null
+        ];
+    } else {
+        return [
+            'valid' => false,
+            'cleaned' => $phone,
+            'error' => 'Phone number must be exactly 10 digits'
+        ];
+    }
+}
+
+function validateFormData($data, $required_fields = []) {
+    $errors = [];
+    
+    // Validate NIDA number if present
+    if (isset($data['nida_number']) && !empty($data['nida_number'])) {
+        $nida_validation = validateNidaNumber($data['nida_number']);
+        if (!$nida_validation['valid']) {
+            $errors['nida_number'] = $nida_validation['error'];
+        } else {
+            $data['nida_number'] = $nida_validation['cleaned'];
+        }
+    }
+    
+    // Validate phone number if present
+    if (isset($data['phone']) && !empty($data['phone'])) {
+        $phone_validation = validatePhoneNumber($data['phone']);
+        if (!$phone_validation['valid']) {
+            $errors['phone'] = $phone_validation['error'];
+        } else {
+            $data['phone'] = $phone_validation['cleaned'];
+        }
+    }
+    
+    // Check required fields
+    foreach ($required_fields as $field) {
+        if (!isset($data[$field]) || empty(trim($data[$field]))) {
+            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . ' is required';
+        }
+    }
+    
+    return [
+        'valid' => empty($errors),
+        'errors' => $errors,
+        'data' => $data
+    ];
 }
 
 ?>

@@ -30,9 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ward_id = (int)$_POST['ward_id'];
     $village_id = (int)$_POST['village_id'];
     
-    // Validation
-    if (empty($house_no) || empty($resident_name) || empty($nida_number) || empty($date_of_birth)) {
-        $error = 'House number, name, NIDA number, and date of birth are required';
+    // Validate form data
+    $validation = validateFormData($_POST, ['house_no', 'resident_name', 'nida_number', 'date_of_birth']);
+    
+    if (!$validation['valid']) {
+        $error = implode(', ', $validation['errors']);
     } elseif ($family_members < 1) {
         $error = 'Family members must be at least 1';
     } elseif (!$ward_id || !$village_id) {
@@ -40,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!canAccessWard($ward_id) || !canAccessVillage($village_id)) {
         $error = 'You do not have permission to register residences in the selected location';
     } else {
+        // Use cleaned data
+        $nida_number = $validation['data']['nida_number'];
+        $phone = $validation['data']['phone'] ?? '';
         try {
             // Check if NIDA number already exists in active residences
             $stmt = $pdo->prepare("SELECT id, resident_name, house_no FROM residences WHERE nida_number = ? AND status = 'active'");
@@ -153,7 +158,8 @@ include 'includes/header.php';
                         </label>
                         <input type="text" id="nida_number" name="nida_number" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo htmlspecialchars($nida_number ?? ''); ?>">
+                               value="<?php echo htmlspecialchars($nida_number ?? ''); ?>"
+                               maxlength="20" placeholder="Enter 20-digit NIDA number">
                     </div>
                     
                     <div>
@@ -162,7 +168,8 @@ include 'includes/header.php';
                         </label>
                         <input type="tel" id="phone" name="phone"
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                               value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+                               value="<?php echo htmlspecialchars($phone ?? ''); ?>"
+                               maxlength="10" placeholder="Enter 10-digit phone number">
                     </div>
                     
                     <div>
@@ -339,5 +346,7 @@ document.getElementById('addResidenceForm').addEventListener('submit', function(
     }
 });
 </script>
+
+<script src="js/validation.js"></script>
 
 <?php include 'includes/footer.php'; ?>

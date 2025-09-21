@@ -19,8 +19,10 @@ $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'];
 $user_location = getUserLocationInfo($user_id);
 
-// Get report data based on user role
+// Get comprehensive report data based on user role
 $report_data = [];
+$status_summary = [];
+$statistics = [];
 $report_title = '';
 $report_subtitle = '';
 
@@ -30,18 +32,50 @@ try {
         $report_title = 'System Overview Report';
         $report_subtitle = 'All Wards and Villages';
         
-        // Get all wards and villages
-        $stmt = $pdo->query("
-            SELECT w.ward_name, COUNT(DISTINCT v.id) as village_count, 
-                   COUNT(DISTINCT r.id) as residence_count,
+        // Get comprehensive statistics
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT w.id) as total_wards,
+                COUNT(DISTINCT v.id) as total_villages,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT fm.id) as total_family_members,
+                SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_residences,
+                SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_residences,
+                SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_residences,
+                SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_residences,
+                SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_residences,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110
+            FROM wards w
+            LEFT JOIN villages v ON w.id = v.ward_id
+            LEFT JOIN residences r ON v.id = r.village_id
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+        ";
+        $stmt = $pdo->query($stats_query);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get status summary by ward
+        $status_query = "
+            SELECT w.ward_name, v.village_name,
+                   COUNT(DISTINCT r.id) as total_residences,
+                   SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_count,
+                   SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_count,
+                   SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_count,
+                   SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_count,
+                   SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
                    COUNT(DISTINCT fm.id) as family_member_count
             FROM wards w
             LEFT JOIN villages v ON w.id = v.ward_id
-            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN residences r ON v.id = r.village_id
             LEFT JOIN family_members fm ON r.id = fm.residence_id
-            GROUP BY w.id, w.ward_name
-            ORDER BY w.ward_name
-        ");
+            GROUP BY w.id, w.ward_name, v.id, v.village_name
+            ORDER BY w.ward_name, v.village_name
+        ";
+        $stmt = $pdo->query($status_query);
         $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } elseif ($user_role === 'admin') {
@@ -49,16 +83,50 @@ try {
         $report_title = 'Ward Administration Report';
         $report_subtitle = 'Ward: ' . $user_location['ward_name'];
         
-        $stmt = $pdo->prepare("
-            SELECT v.village_name, COUNT(DISTINCT r.id) as residence_count,
+        // Get comprehensive statistics for the ward
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT v.id) as total_villages,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT fm.id) as total_family_members,
+                SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_residences,
+                SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_residences,
+                SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_residences,
+                SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_residences,
+                SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_residences,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110
+            FROM villages v
+            LEFT JOIN residences r ON v.id = r.village_id
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE v.ward_id = ?
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['ward_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get status summary by village
+        $status_query = "
+            SELECT v.village_name,
+                   COUNT(DISTINCT r.id) as total_residences,
+                   SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_count,
+                   SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_count,
+                   SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_count,
+                   SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_count,
+                   SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
                    COUNT(DISTINCT fm.id) as family_member_count
             FROM villages v
-            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN residences r ON v.id = r.village_id
             LEFT JOIN family_members fm ON r.id = fm.residence_id
             WHERE v.ward_id = ?
             GROUP BY v.id, v.village_name
             ORDER BY v.village_name
-        ");
+        ";
+        $stmt = $pdo->prepare($status_query);
         $stmt->execute([$user_location['ward_id']]);
         $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -67,16 +135,50 @@ try {
         $report_title = 'Ward Executive Officer Report';
         $report_subtitle = 'Ward: ' . $user_location['ward_name'];
         
-        $stmt = $pdo->prepare("
-            SELECT v.village_name, COUNT(DISTINCT r.id) as residence_count,
+        // Get comprehensive statistics for the ward
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT v.id) as total_villages,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT fm.id) as total_family_members,
+                SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_residences,
+                SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_residences,
+                SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_residences,
+                SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_residences,
+                SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_residences,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110
+            FROM villages v
+            LEFT JOIN residences r ON v.id = r.village_id
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE v.ward_id = ?
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['ward_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get status summary by village
+        $status_query = "
+            SELECT v.village_name,
+                   COUNT(DISTINCT r.id) as total_residences,
+                   SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_count,
+                   SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_count,
+                   SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_count,
+                   SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_count,
+                   SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
                    COUNT(DISTINCT fm.id) as family_member_count
             FROM villages v
-            LEFT JOIN residences r ON v.id = r.village_id AND r.status = 'active'
+            LEFT JOIN residences r ON v.id = r.village_id
             LEFT JOIN family_members fm ON r.id = fm.residence_id
             WHERE v.ward_id = ?
             GROUP BY v.id, v.village_name
             ORDER BY v.village_name
-        ");
+        ";
+        $stmt = $pdo->prepare($status_query);
         $stmt->execute([$user_location['ward_id']]);
         $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -85,19 +187,45 @@ try {
         $report_title = 'Village Executive Officer Report';
         $report_subtitle = 'Village: ' . $user_location['village_name'];
         
-        $stmt = $pdo->prepare("
+        // Get comprehensive statistics for the village
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT fm.id) as total_family_members,
+                SUM(CASE WHEN r.status = 'active' THEN 1 ELSE 0 END) as active_residences,
+                SUM(CASE WHEN r.status = 'inactive' THEN 1 ELSE 0 END) as inactive_residences,
+                SUM(CASE WHEN r.status = 'moved' THEN 1 ELSE 0 END) as moved_residences,
+                SUM(CASE WHEN r.status = 'pending_approval' THEN 1 ELSE 0 END) as pending_residences,
+                SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) as approved_residences,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110
+            FROM residences r
+            LEFT JOIN family_members fm ON r.id = fm.residence_id
+            WHERE r.village_id = ?
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['village_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get detailed residence data with status
+        $status_query = "
             SELECT r.resident_name, r.house_no, r.gender, r.date_of_birth,
                    r.nida_number, r.phone, r.occupation, r.ownership,
-                   r.education_level, r.employment_status,
+                   r.education_level, r.employment_status, r.status,
                    COUNT(fm.id) as family_member_count
             FROM residences r
             LEFT JOIN family_members fm ON r.id = fm.residence_id
-            WHERE r.village_id = ? AND r.status = 'active'
+            WHERE r.village_id = ?
             GROUP BY r.id, r.resident_name, r.house_no, r.gender, r.date_of_birth,
                      r.nida_number, r.phone, r.occupation, r.ownership,
-                     r.education_level, r.employment_status
-            ORDER BY r.resident_name
-        ");
+                     r.education_level, r.employment_status, r.status
+            ORDER BY r.status, r.resident_name
+        ";
+        $stmt = $pdo->prepare($status_query);
         $stmt->execute([$user_location['village_id']]);
         $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -188,10 +316,10 @@ if (isset($_GET['export'])) {
         $pdf->Cell(0, 8, 'Scope: ' . $report_subtitle, 0, 1, 'L');
         $pdf->Ln(10);
         
-        // Data table
-        if (!empty($report_data)) {
+        // Statistics Overview
+        if (!empty($statistics)) {
             $pdf->SetFont('helvetica', 'B', 14);
-            $pdf->Cell(0, 10, 'Data Summary', 0, 1, 'L');
+            $pdf->Cell(0, 10, 'Statistics Overview', 0, 1, 'L');
             $pdf->Ln(5);
             
             $pdf->SetFont('helvetica', '', 10);
@@ -201,46 +329,127 @@ if (isset($_GET['export'])) {
             $pdf->SetLineWidth(0.3);
             $pdf->SetFont('helvetica', 'B');
             
+            // Statistics table
+            $pdf->Cell(60, 8, 'Metric', 1, 0, 'C', 1);
+            $pdf->Cell(30, 8, 'Count', 1, 1, 'C', 1);
+            
+            $pdf->SetFont('helvetica', '');
+            $stats_data = array(
+                array('Total Residences', $statistics['total_residences'] ?? 0),
+                array('Total Family Members', $statistics['total_family_members'] ?? 0),
+                array('Active Residences', $statistics['active_residences'] ?? 0),
+                array('Inactive Residences', $statistics['inactive_residences'] ?? 0),
+                array('Moved Residences', $statistics['moved_residences'] ?? 0),
+                array('Pending Approval', $statistics['pending_residences'] ?? 0),
+                array('Approved Residences', $statistics['approved_residences'] ?? 0)
+            );
+            
+            if (isset($statistics['total_wards'])) {
+                $stats_data[] = array('Total Wards', $statistics['total_wards']);
+            }
+            if (isset($statistics['total_villages'])) {
+                $stats_data[] = array('Total Villages', $statistics['total_villages']);
+            }
+            
+            foreach ($stats_data as $stat) {
+                $pdf->Cell(60, 8, $stat[0], 1, 0, 'L', 0);
+                $pdf->Cell(30, 8, $stat[1], 1, 1, 'C', 0);
+            }
+            $pdf->Ln(10);
+        }
+        
+        // Age Demographics Table
+        if (!empty($statistics)) {
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->Cell(0, 10, 'Age Demographics', 0, 1, 'L');
+            $pdf->Ln(5);
+            
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->SetTextColor(0);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetLineWidth(0.3);
+            $pdf->SetFont('helvetica', 'B');
+            
+            // Age demographics table
+            $pdf->Cell(60, 8, 'Age Group', 1, 0, 'C', 1);
+            $pdf->Cell(30, 8, 'Count', 1, 1, 'C', 1);
+            
+            $pdf->SetFont('helvetica', '');
+            $age_data = array(
+                array('Children (Under 18)', $statistics['children_under_18'] ?? 0),
+                array('Young Adults (18-24)', $statistics['adults_18_24'] ?? 0),
+                array('Adults (25-39)', $statistics['adults_25_39'] ?? 0),
+                array('Middle Age (40-54)', $statistics['adults_40_54'] ?? 0),
+                array('Pre-Senior (55-65)', $statistics['adults_55_65'] ?? 0),
+                array('Seniors (66-110)', $statistics['seniors_66_110'] ?? 0)
+            );
+            
+            foreach ($age_data as $age) {
+                $pdf->Cell(60, 8, $age[0], 1, 0, 'L', 0);
+                $pdf->Cell(30, 8, $age[1], 1, 1, 'C', 0);
+            }
+            $pdf->Ln(10);
+        }
+        
+        // Status Summary Table
+        if (!empty($report_data)) {
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->Cell(0, 10, 'Status Summary by Location', 0, 1, 'L');
+            $pdf->Ln(5);
+            
+            $pdf->SetFont('helvetica', '', 9);
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->SetTextColor(0);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetLineWidth(0.3);
+            $pdf->SetFont('helvetica', 'B');
+            
             // Table headers based on role
             if ($user_role === 'veo') {
-                // VEO sees detailed residence data
-                $pdf->Cell(30, 8, 'Resident Name', 1, 0, 'C', 1);
-                $pdf->Cell(20, 8, 'House No', 1, 0, 'C', 1);
-                $pdf->Cell(15, 8, 'Gender', 1, 0, 'C', 1);
-                $pdf->Cell(25, 8, 'Date of Birth', 1, 0, 'C', 1);
-                $pdf->Cell(30, 8, 'NIDA Number', 1, 0, 'C', 1);
+                // VEO sees detailed residence data with status
+                $pdf->Cell(25, 8, 'Resident Name', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'House No', 1, 0, 'C', 1);
+                $pdf->Cell(12, 8, 'Gender', 1, 0, 'C', 1);
+                $pdf->Cell(20, 8, 'Status', 1, 0, 'C', 1);
+                $pdf->Cell(20, 8, 'Family Members', 1, 0, 'C', 1);
                 $pdf->Cell(25, 8, 'Phone', 1, 0, 'C', 1);
                 $pdf->Cell(20, 8, 'Occupation', 1, 0, 'C', 1);
-                $pdf->Cell(15, 8, 'Ownership', 1, 0, 'C', 1);
-                $pdf->Cell(20, 8, 'Education', 1, 0, 'C', 1);
-                $pdf->Cell(20, 8, 'Employment', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Ownership', 1, 1, 'C', 1);
+                
+                $pdf->SetFont('helvetica', '', 7);
+                foreach ($report_data as $row) {
+                    $pdf->Cell(25, 8, $row['resident_name'], 1, 0, 'L', 0);
+                    $pdf->Cell(15, 8, $row['house_no'], 1, 0, 'C', 0);
+                    $pdf->Cell(12, 8, $row['gender'], 1, 0, 'C', 0);
+                    $pdf->Cell(20, 8, ucfirst($row['status']), 1, 0, 'C', 0);
+                    $pdf->Cell(20, 8, $row['family_member_count'], 1, 0, 'C', 0);
+                    $pdf->Cell(25, 8, $row['phone'], 1, 0, 'C', 0);
+                    $pdf->Cell(20, 8, $row['occupation'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['ownership'], 1, 1, 'C', 0);
+                }
+            } else {
+                // Other roles see status summary by location
+                $pdf->Cell(40, 8, 'Location', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Total', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Active', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Inactive', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Moved', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Pending', 1, 0, 'C', 1);
+                $pdf->Cell(15, 8, 'Approved', 1, 0, 'C', 1);
                 $pdf->Cell(20, 8, 'Family Members', 1, 1, 'C', 1);
                 
                 $pdf->SetFont('helvetica', '', 8);
                 foreach ($report_data as $row) {
-                    $pdf->Cell(30, 8, $row['resident_name'], 1, 0, 'L', 0);
-                    $pdf->Cell(20, 8, $row['house_no'], 1, 0, 'C', 0);
-                    $pdf->Cell(15, 8, $row['gender'], 1, 0, 'C', 0);
-                    $pdf->Cell(25, 8, $row['date_of_birth'], 1, 0, 'C', 0);
-                    $pdf->Cell(30, 8, $row['nida_number'], 1, 0, 'C', 0);
-                    $pdf->Cell(25, 8, $row['phone'], 1, 0, 'C', 0);
-                    $pdf->Cell(20, 8, $row['occupation'], 1, 0, 'C', 0);
-                    $pdf->Cell(15, 8, $row['ownership'], 1, 0, 'C', 0);
-                    $pdf->Cell(20, 8, $row['education_level'], 1, 0, 'C', 0);
-                    $pdf->Cell(20, 8, $row['employment_status'], 1, 0, 'C', 0);
+                    $location_name = $row['village_name'] ?? $row['ward_name'];
+                    $pdf->Cell(40, 8, $location_name, 1, 0, 'L', 0);
+                    $pdf->Cell(15, 8, $row['total_residences'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['active_count'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['inactive_count'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['moved_count'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['pending_count'], 1, 0, 'C', 0);
+                    $pdf->Cell(15, 8, $row['approved_count'], 1, 0, 'C', 0);
                     $pdf->Cell(20, 8, $row['family_member_count'], 1, 1, 'C', 0);
-                }
-            } else {
-                // Other roles see summary data
-                $pdf->Cell(60, 8, 'Location', 1, 0, 'C', 1);
-                $pdf->Cell(30, 8, 'Residences', 1, 0, 'C', 1);
-                $pdf->Cell(30, 8, 'Family Members', 1, 1, 'C', 1);
-                
-                $pdf->SetFont('helvetica', '');
-                foreach ($report_data as $row) {
-                    $pdf->Cell(60, 8, $row['village_name'] ?? $row['ward_name'], 1, 0, 'L', 0);
-                    $pdf->Cell(30, 8, $row['residence_count'], 1, 0, 'C', 0);
-                    $pdf->Cell(30, 8, $row['family_member_count'], 1, 1, 'C', 0);
                 }
             }
         } else {
@@ -325,32 +534,67 @@ if (isset($_GET['export'])) {
         $output = fopen('php://output', 'w');
         
         // Write report header
-        fputcsv($output, array('Ward Registration System - Overview Report'));
+        fputcsv($output, array('Ward Registration System - Comprehensive Summary Report'));
         fputcsv($output, array('Generated on: ' . date('Y-m-d H:i:s')));
         fputcsv($output, array('Generated by: ' . $_SESSION['username'] . ' (' . getRoleDisplayName($user_role) . ')'));
         fputcsv($output, array('Scope: ' . $report_subtitle));
         fputcsv($output, array(''));
         
-        // CSV headers
-        if ($user_role === 'veo') {
-            fputcsv($output, array('DETAILED RESIDENCE DATA'));
-            fputcsv($output, array('Resident Name', 'House No', 'Gender', 'Date of Birth', 'NIDA Number', 
-                                 'Phone', 'Occupation', 'Ownership', 'Education Level', 'Employment Status', 'Family Members'));
-        } else {
-            fputcsv($output, array('WARD AND VILLAGE SUMMARY'));
-            fputcsv($output, array('Location', 'Residences', 'Family Members'));
+        // Statistics Overview
+        if (!empty($statistics)) {
+            fputcsv($output, array('STATISTICS OVERVIEW'));
+            fputcsv($output, array('Metric', 'Count'));
+            fputcsv($output, array('Total Residences', $statistics['total_residences'] ?? 0));
+            fputcsv($output, array('Total Family Members', $statistics['total_family_members'] ?? 0));
+            fputcsv($output, array('Active Residences', $statistics['active_residences'] ?? 0));
+            fputcsv($output, array('Inactive Residences', $statistics['inactive_residences'] ?? 0));
+            fputcsv($output, array('Moved Residences', $statistics['moved_residences'] ?? 0));
+            fputcsv($output, array('Pending Approval', $statistics['pending_residences'] ?? 0));
+            fputcsv($output, array('Approved Residences', $statistics['approved_residences'] ?? 0));
+            
+            if (isset($statistics['total_wards'])) {
+                fputcsv($output, array('Total Wards', $statistics['total_wards']));
+            }
+            if (isset($statistics['total_villages'])) {
+                fputcsv($output, array('Total Villages', $statistics['total_villages']));
+            }
+            fputcsv($output, array(''));
+            
+            // Age Demographics
+            fputcsv($output, array('AGE DEMOGRAPHICS'));
+            fputcsv($output, array('Age Group', 'Count'));
+            fputcsv($output, array('Children (Under 18)', $statistics['children_under_18'] ?? 0));
+            fputcsv($output, array('Young Adults (18-24)', $statistics['adults_18_24'] ?? 0));
+            fputcsv($output, array('Adults (25-39)', $statistics['adults_25_39'] ?? 0));
+            fputcsv($output, array('Middle Age (40-54)', $statistics['adults_40_54'] ?? 0));
+            fputcsv($output, array('Pre-Senior (55-65)', $statistics['adults_55_65'] ?? 0));
+            fputcsv($output, array('Seniors (66-110)', $statistics['seniors_66_110'] ?? 0));
+            fputcsv($output, array(''));
         }
         
-        // Data rows
-        foreach ($report_data as $data_row) {
-            if ($user_role === 'veo') {
+        // Status Summary Data
+        if ($user_role === 'veo') {
+            fputcsv($output, array('DETAILED RESIDENCE DATA WITH STATUS'));
+            fputcsv($output, array('Resident Name', 'House No', 'Gender', 'Status', 'Family Members', 
+                                 'Phone', 'Occupation', 'Ownership', 'Education Level', 'Employment Status'));
+            
+            foreach ($report_data as $data_row) {
                 fputcsv($output, array($data_row['resident_name'], $data_row['house_no'], $data_row['gender'], 
-                                    $data_row['date_of_birth'], $data_row['nida_number'], $data_row['phone'],
-                                    $data_row['occupation'], $data_row['ownership'], $data_row['education_level'],
-                                    $data_row['employment_status'], $data_row['family_member_count']));
-            } else {
-                fputcsv($output, array($data_row['village_name'] ?? $data_row['ward_name'], 
-                                    $data_row['residence_count'], $data_row['family_member_count']));
+                                    ucfirst($data_row['status']), $data_row['family_member_count'],
+                                    $data_row['phone'], $data_row['occupation'], $data_row['ownership'], 
+                                    $data_row['education_level'], $data_row['employment_status']));
+            }
+        } else {
+            fputcsv($output, array('STATUS SUMMARY BY LOCATION'));
+            fputcsv($output, array('Location', 'Total Residences', 'Active', 'Inactive', 'Moved', 
+                                 'Pending Approval', 'Approved', 'Family Members'));
+            
+            foreach ($report_data as $data_row) {
+                $location_name = $data_row['village_name'] ?? $data_row['ward_name'];
+                fputcsv($output, array($location_name, $data_row['total_residences'], 
+                                    $data_row['active_count'], $data_row['inactive_count'], 
+                                    $data_row['moved_count'], $data_row['pending_count'], 
+                                    $data_row['approved_count'], $data_row['family_member_count']));
             }
         }
         
@@ -843,32 +1087,92 @@ include 'includes/header.php';
         <!-- Stats Overview -->
         <div class="stats-grid">
             <div class="stat-card fade-in" style="animation-delay: 0.1s;">
-                <div class="stat-icon">
-                    <i class="fas fa-database"></i>
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-home"></i>
                 </div>
-                <div class="stat-value"><?php echo count($report_data); ?></div>
-                <div class="stat-label">Total Records</div>
+                <div class="stat-value"><?php echo $statistics['total_residences'] ?? 0; ?></div>
+                <div class="stat-label">Total Residences</div>
             </div>
             <div class="stat-card fade-in" style="animation-delay: 0.2s;">
-                <div class="stat-icon">
-                    <i class="fas fa-calendar-alt"></i>
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-users"></i>
                 </div>
-                <div class="stat-value"><?php echo date('M d, Y'); ?></div>
-                <div class="stat-label">Report Date</div>
+                <div class="stat-value"><?php echo $statistics['total_family_members'] ?? 0; ?></div>
+                <div class="stat-label">Family Members</div>
             </div>
             <div class="stat-card fade-in" style="animation-delay: 0.3s;">
-                <div class="stat-icon">
-                    <i class="fas fa-user-tag"></i>
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="fas fa-check-circle"></i>
                 </div>
-                <div class="stat-value"><?php echo getRoleDisplayName($user_role); ?></div>
-                <div class="stat-label">Your Role</div>
+                <div class="stat-value"><?php echo $statistics['active_residences'] ?? 0; ?></div>
+                <div class="stat-label">Active</div>
             </div>
             <div class="stat-card fade-in" style="animation-delay: 0.4s;">
-                <div class="stat-icon">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
                     <i class="fas fa-clock"></i>
                 </div>
-                <div class="stat-value"><?php echo date('H:i'); ?></div>
-                <div class="stat-label">Current Time</div>
+                <div class="stat-value"><?php echo $statistics['pending_residences'] ?? 0; ?></div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.5s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['inactive_residences'] ?? 0; ?></div>
+                <div class="stat-label">Inactive</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.6s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['moved_residences'] ?? 0; ?></div>
+                <div class="stat-label">Moved</div>
+            </div>
+        </div>
+
+        <!-- Age Demographics -->
+        <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card fade-in" style="animation-delay: 0.7s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
+                    <i class="fas fa-child"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['children_under_18'] ?? 0; ?></div>
+                <div class="stat-label">Children (Under 18)</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.8s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['adults_18_24'] ?? 0; ?></div>
+                <div class="stat-label">Young Adults (18-24)</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 0.9s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['adults_25_39'] ?? 0; ?></div>
+                <div class="stat-label">Adults (25-39)</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 1.0s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['adults_40_54'] ?? 0; ?></div>
+                <div class="stat-label">Middle Age (40-54)</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 1.1s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);">
+                    <i class="fas fa-user-clock"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['adults_55_65'] ?? 0; ?></div>
+                <div class="stat-label">Pre-Senior (55-65)</div>
+            </div>
+            <div class="stat-card fade-in" style="animation-delay: 1.2s;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+                <div class="stat-value"><?php echo $statistics['seniors_66_110'] ?? 0; ?></div>
+                <div class="stat-label">Seniors (66-110)</div>
             </div>
         </div>
 
@@ -905,17 +1209,21 @@ include 'includes/header.php';
                                     <th>Resident Name</th>
                                     <th>House No</th>
                                     <th>Gender</th>
-                                    <th>Date of Birth</th>
-                                    <th>NIDA Number</th>
+                                    <th>Status</th>
+                                    <th>Family Members</th>
                                     <th>Phone</th>
                                     <th>Occupation</th>
                                     <th>Ownership</th>
                                     <th>Education</th>
                                     <th>Employment</th>
-                                    <th>Family Members</th>
                                 <?php else: ?>
                                     <th>Location</th>
-                                    <th>Residences</th>
+                                    <th>Total</th>
+                                    <th>Active</th>
+                                    <th>Inactive</th>
+                                    <th>Moved</th>
+                                    <th>Pending</th>
+                                    <th>Approved</th>
                                     <th>Family Members</th>
                                 <?php endif; ?>
                             </tr>
@@ -938,8 +1246,28 @@ include 'includes/header.php';
                                                 <?php echo htmlspecialchars($row['gender']); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo htmlspecialchars($row['date_of_birth']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['nida_number']); ?></td>
+                                        <td>
+                                            <?php
+                                            $status = $row['status'] ?? 'active';
+                                            $status_class = '';
+                                            switch($status) {
+                                                case 'active': $status_class = 'badge-success'; break;
+                                                case 'inactive': $status_class = 'badge-danger'; break;
+                                                case 'moved': $status_class = 'badge-warning'; break;
+                                                case 'pending_approval': $status_class = 'badge-info'; break;
+                                                case 'approved': $status_class = 'badge-primary'; break;
+                                                default: $status_class = 'badge-secondary';
+                                            }
+                                            ?>
+                                            <span class="badge <?php echo $status_class; ?>">
+                                                <?php echo ucfirst(str_replace('_', ' ', $status)); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary">
+                                                <i class="fas fa-users me-1"></i> <?php echo $row['family_member_count']; ?>
+                                            </span>
+                                        </td>
                                         <td>
                                             <a href="tel:<?php echo htmlspecialchars($row['phone']); ?>" class="text-primary">
                                                 <i class="fas fa-phone-alt me-1"></i> <?php echo htmlspecialchars($row['phone']); ?>
@@ -957,11 +1285,6 @@ include 'includes/header.php';
                                                 <?php echo htmlspecialchars($row['employment_status']); ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <span class="badge badge-primary">
-                                                <i class="fas fa-users me-1"></i> <?php echo $row['family_member_count']; ?>
-                                            </span>
-                                        </td>
                                     <?php else: ?>
                                         <td>
                                             <i class="fas fa-map-marker-alt text-danger me-2"></i>
@@ -969,11 +1292,36 @@ include 'includes/header.php';
                                         </td>
                                         <td>
                                             <span class="badge badge-info">
-                                                <i class="fas fa-home me-1"></i> <?php echo $row['residence_count']; ?>
+                                                <i class="fas fa-home me-1"></i> <?php echo $row['total_residences']; ?>
                                             </span>
                                         </td>
                                         <td>
                                             <span class="badge badge-success">
+                                                <i class="fas fa-check-circle me-1"></i> <?php echo $row['active_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-danger">
+                                                <i class="fas fa-times-circle me-1"></i> <?php echo $row['inactive_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-warning">
+                                                <i class="fas fa-arrow-right me-1"></i> <?php echo $row['moved_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-clock me-1"></i> <?php echo $row['pending_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary">
+                                                <i class="fas fa-thumbs-up me-1"></i> <?php echo $row['approved_count']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary">
                                                 <i class="fas fa-users me-1"></i> <?php echo $row['family_member_count']; ?>
                                             </span>
                                         </td>

@@ -75,12 +75,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_family_member']))
     $age = $today->diff($birth_date)->y;
     $is_minor = $age < 18;
     
-    // Validation
-    if (empty($name) || empty($gender) || empty($date_of_birth) || empty($relationship)) {
-        $error = 'Name, gender, date of birth, and relationship are required';
-    } elseif (!$is_minor && empty($nida_number)) {
-        $error = 'NIDA number is required for family members 18 years and above';
+    // Validate form data
+    $required_fields = ['name', 'gender', 'date_of_birth', 'relationship'];
+    if (!$is_minor) {
+        $required_fields[] = 'nida_number';
+    }
+    
+    $validation = validateFormData($_POST, $required_fields);
+    
+    if (!$validation['valid']) {
+        $error = implode(', ', $validation['errors']);
     } else {
+        // Use cleaned data
+        $nida_number = $validation['data']['nida_number'] ?? '';
+        $phone = $validation['data']['phone'] ?? '';
         try {
             // Check if NIDA number already exists (for adults)
             if (!$is_minor && !empty($nida_number)) {
@@ -112,6 +120,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_family_member']))
     }
 }
 
+// Handle family member editing
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_family_member'])) {
+    $member_id = (int)$_POST['member_id'];
+    $name = sanitizeInput($_POST['name']);
+    $gender = $_POST['gender'];
+    $date_of_birth = $_POST['date_of_birth'];
+    $nida_number = sanitizeInput($_POST['nida_number']);
+    $relationship = $_POST['relationship'];
+    $phone = sanitizeInput($_POST['phone']);
+    $email = sanitizeInput($_POST['email']);
+    $occupation = sanitizeInput($_POST['occupation']);
+    $education_level = $_POST['education_level'];
+    $employment_status = $_POST['employment_status'];
+    
+    // Calculate age to determine if minor
+    $birth_date = new DateTime($date_of_birth);
+    $today = new DateTime();
+    $age = $today->diff($birth_date)->y;
+    $is_minor = $age < 18;
+    
+    // Validate form data
+    $required_fields = ['name', 'gender', 'date_of_birth', 'relationship'];
+    if (!$is_minor) {
+        $required_fields[] = 'nida_number';
+    }
+    
+    $validation = validateFormData($_POST, $required_fields);
+    
+    if (!$validation['valid']) {
+        $error = implode(', ', $validation['errors']);
+    } else {
+        // Use cleaned data
+        $nida_number = $validation['data']['nida_number'] ?? '';
+        $phone = $validation['data']['phone'] ?? '';
+        try {
+            // Check if NIDA number already exists in another family member (for adults)
+            if (!$is_minor && !empty($nida_number)) {
+                $stmt = $pdo->prepare("SELECT id FROM family_members WHERE nida_number = ? AND id != ? AND residence_id = ?");
+                $stmt->execute([$nida_number, $member_id, $residence_id]);
+                if ($stmt->fetch()) {
+                    $error = 'NIDA number already exists for another family member in this residence';
+                } else {
+                    // Check if NIDA exists in other residences
+                    $stmt = $pdo->prepare("SELECT id FROM residences WHERE nida_number = ? AND status = 'active'");
+                    $stmt->execute([$nida_number]);
+                    if ($stmt->fetch()) {
+                        $error = 'NIDA number already exists in another residence';
+                    } else {
+                        // Check deleted residences
+                        $stmt = $pdo->prepare("SELECT id, resident_name, house_no FROM deleted_residences WHERE nida_number = ?");
+                        $stmt->execute([$nida_number]);
+                        $deleted_residence = $stmt->fetch();
+                        if ($deleted_residence) {
+                            $error = 'This NIDA number was previously registered but deleted. Please contact administrator to restore or use a different NIDA number.';
+                        }
+                    }
+                }
+            }
+            
+            if (empty($error)) {
+                // Update family member
+                $stmt = $pdo->prepare("UPDATE family_members SET name = ?, gender = ?, date_of_birth = ?, nida_number = ?, relationship = ?, is_minor = ?, phone = ?, email = ?, occupation = ?, education_level = ?, employment_status = ? WHERE id = ? AND residence_id = ?");
+                $stmt->execute([$name, $gender, $date_of_birth, $nida_number, $relationship, $is_minor, $phone, $email, $occupation, $education_level, $employment_status, $member_id, $residence_id]);
+                
+                $message = 'Family member updated successfully';
+            }
+        } catch (PDOException $e) {
+            $error = 'Database error occurred';
+        }
+    }
+}
+
 // Handle family member deletion
 if (isset($_GET['delete_member']) && is_numeric($_GET['delete_member'])) {
     $member_id = (int)$_GET['delete_member'];
@@ -122,6 +202,19 @@ if (isset($_GET['delete_member']) && is_numeric($_GET['delete_member'])) {
         $message = 'Family member removed successfully';
     } catch (PDOException $e) {
         $error = 'Error removing family member';
+    }
+}
+
+// Get family member for editing
+$edit_member = null;
+if (isset($_GET['edit_member']) && is_numeric($_GET['edit_member'])) {
+    $member_id = (int)$_GET['edit_member'];
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM family_members WHERE id = ? AND residence_id = ?");
+        $stmt->execute([$member_id, $residence_id]);
+        $edit_member = $stmt->fetch();
+    } catch (PDOException $e) {
+        $error = 'Error loading family member for editing';
     }
 }
 
@@ -223,14 +316,16 @@ include 'includes/header.php';
                         <div>
                             <label for="nida_number" class="block text-sm font-medium text-gray-700 mb-1">NIDA Number</label>
                             <input type="text" id="nida_number" name="nida_number"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   maxlength="20" placeholder="Enter 20-digit NIDA number">
                             <p class="text-xs text-gray-500 mt-1">Required for 18+ years</p>
                         </div>
                         
                         <div>
                             <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                             <input type="tel" id="phone" name="phone"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   maxlength="10" placeholder="Enter 10-digit phone number">
                         </div>
                         
                         <div>
@@ -280,6 +375,125 @@ include 'includes/header.php';
                     </div>
                 </form>
             </div>
+            
+            <!-- Edit Family Member Form -->
+            <?php if ($edit_member): ?>
+            <div class="bg-yellow-50 p-4 rounded-lg mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-edit mr-2"></i>Edit Family Member: <?php echo htmlspecialchars($edit_member['name']); ?>
+                </h3>
+                
+                <form method="POST" class="space-y-4" id="editFamilyMemberForm">
+                    <input type="hidden" name="member_id" value="<?php echo $edit_member['id']; ?>">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label for="edit_name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                            <input type="text" id="edit_name" name="name" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="<?php echo htmlspecialchars($edit_member['name']); ?>">
+                        </div>
+                        
+                        <div>
+                            <label for="edit_gender" class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+                            <select id="edit_gender" name="gender" required
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select Gender</option>
+                                <option value="male" <?php echo $edit_member['gender'] === 'male' ? 'selected' : ''; ?>>Male</option>
+                                <option value="female" <?php echo $edit_member['gender'] === 'female' ? 'selected' : ''; ?>>Female</option>
+                                <option value="other" <?php echo $edit_member['gender'] === 'other' ? 'selected' : ''; ?>>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="edit_date_of_birth" class="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
+                            <input type="date" id="edit_date_of_birth" name="date_of_birth" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="<?php echo $edit_member['date_of_birth']; ?>">
+                        </div>
+                        
+                        <div>
+                            <label for="edit_relationship" class="block text-sm font-medium text-gray-700 mb-1">Relationship *</label>
+                            <select id="edit_relationship" name="relationship" required
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select Relationship</option>
+                                <option value="spouse" <?php echo $edit_member['relationship'] === 'spouse' ? 'selected' : ''; ?>>Spouse</option>
+                                <option value="child" <?php echo $edit_member['relationship'] === 'child' ? 'selected' : ''; ?>>Child</option>
+                                <option value="parent" <?php echo $edit_member['relationship'] === 'parent' ? 'selected' : ''; ?>>Parent</option>
+                                <option value="sibling" <?php echo $edit_member['relationship'] === 'sibling' ? 'selected' : ''; ?>>Sibling</option>
+                                <option value="other" <?php echo $edit_member['relationship'] === 'other' ? 'selected' : ''; ?>>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="edit_nida_number" class="block text-sm font-medium text-gray-700 mb-1">NIDA Number</label>
+                            <input type="text" id="edit_nida_number" name="nida_number"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   maxlength="20" placeholder="Enter 20-digit NIDA number"
+                                   value="<?php echo htmlspecialchars($edit_member['nida_number']); ?>">
+                            <p class="text-xs text-gray-500 mt-1" id="edit_nida_help">Required for 18+ years</p>
+                        </div>
+                        
+                        <div>
+                            <label for="edit_phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" id="edit_phone" name="phone"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   maxlength="10" placeholder="Enter 10-digit phone number"
+                                   value="<?php echo htmlspecialchars($edit_member['phone']); ?>">
+                        </div>
+                        
+                        <div>
+                            <label for="edit_email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" id="edit_email" name="email"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="<?php echo htmlspecialchars($edit_member['email']); ?>">
+                        </div>
+                        
+                        <div>
+                            <label for="edit_occupation" class="block text-sm font-medium text-gray-700 mb-1">Occupation</label>
+                            <input type="text" id="edit_occupation" name="occupation"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="<?php echo htmlspecialchars($edit_member['occupation']); ?>">
+                        </div>
+                        
+                        <div>
+                            <label for="edit_education_level" class="block text-sm font-medium text-gray-700 mb-1">Education Level</label>
+                            <select id="edit_education_level" name="education_level"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="none" <?php echo $edit_member['education_level'] === 'none' ? 'selected' : ''; ?>>None</option>
+                                <option value="primary" <?php echo $edit_member['education_level'] === 'primary' ? 'selected' : ''; ?>>Primary</option>
+                                <option value="secondary" <?php echo $edit_member['education_level'] === 'secondary' ? 'selected' : ''; ?>>Secondary</option>
+                                <option value="diploma" <?php echo $edit_member['education_level'] === 'diploma' ? 'selected' : ''; ?>>Diploma</option>
+                                <option value="degree" <?php echo $edit_member['education_level'] === 'degree' ? 'selected' : ''; ?>>Degree</option>
+                                <option value="masters" <?php echo $edit_member['education_level'] === 'masters' ? 'selected' : ''; ?>>Masters</option>
+                                <option value="phd" <?php echo $edit_member['education_level'] === 'phd' ? 'selected' : ''; ?>>PhD</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="edit_employment_status" class="block text-sm font-medium text-gray-700 mb-1">Employment Status</label>
+                            <select id="edit_employment_status" name="employment_status"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="unemployed" <?php echo $edit_member['employment_status'] === 'unemployed' ? 'selected' : ''; ?>>Unemployed</option>
+                                <option value="employed" <?php echo $edit_member['employment_status'] === 'employed' ? 'selected' : ''; ?>>Employed</option>
+                                <option value="student" <?php echo $edit_member['employment_status'] === 'student' ? 'selected' : ''; ?>>Student</option>
+                                <option value="retired" <?php echo $edit_member['employment_status'] === 'retired' ? 'selected' : ''; ?>>Retired</option>
+                                <option value="self_employed" <?php echo $edit_member['employment_status'] === 'self_employed' ? 'selected' : ''; ?>>Self Employed</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4">
+                        <a href="?id=<?php echo $residence_id; ?>" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-200">
+                            <i class="fas fa-times mr-2"></i>Cancel
+                        </a>
+                        <button type="submit" name="edit_family_member" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200">
+                            <i class="fas fa-save mr-2"></i>Update Family Member
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
             
             <!-- Family Members List -->
             <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -345,12 +559,19 @@ include 'includes/header.php';
                                         <?php echo $member['occupation'] ? htmlspecialchars($member['occupation']) : 'N/A'; ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="?id=<?php echo $residence_id; ?>&delete_member=<?php echo $member['id']; ?>" 
-                                           class="text-red-600 hover:text-red-900"
-                                           onclick="return confirm('Are you sure you want to remove this family member?')"
-                                           title="Remove Family Member">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
+                                        <div class="flex space-x-2">
+                                            <a href="?id=<?php echo $residence_id; ?>&edit_member=<?php echo $member['id']; ?>" 
+                                               class="text-blue-600 hover:text-blue-900"
+                                               title="Edit Family Member">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="?id=<?php echo $residence_id; ?>&delete_member=<?php echo $member['id']; ?>" 
+                                               class="text-red-600 hover:text-red-900"
+                                               onclick="return confirm('Are you sure you want to remove this family member?')"
+                                               title="Remove Family Member">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -389,7 +610,7 @@ document.getElementById('date_of_birth').addEventListener('change', function() {
     }
 });
 
-// Form validation
+// Form validation for add form
 document.getElementById('addFamilyMemberForm').addEventListener('submit', function(e) {
     const birthDate = new Date(document.getElementById('date_of_birth').value);
     const today = new Date();
@@ -402,6 +623,39 @@ document.getElementById('addFamilyMemberForm').addEventListener('submit', functi
         return false;
     }
 });
+
+// Auto-validate NIDA requirement for adults in edit form
+document.getElementById('edit_date_of_birth').addEventListener('change', function() {
+    const birthDate = new Date(this.value);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const nidaField = document.getElementById('edit_nida_number');
+    const nidaHelp = document.getElementById('edit_nida_help');
+    
+    if (age >= 18) {
+        nidaField.required = true;
+        nidaHelp.textContent = 'Required for 18+ years';
+    } else {
+        nidaField.required = false;
+        nidaHelp.textContent = 'Not required for minors';
+    }
+});
+
+// Form validation for edit form
+document.getElementById('editFamilyMemberForm').addEventListener('submit', function(e) {
+    const birthDate = new Date(document.getElementById('edit_date_of_birth').value);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const nidaNumber = document.getElementById('edit_nida_number').value;
+    
+    if (age >= 18 && !nidaNumber.trim()) {
+        e.preventDefault();
+        alert('NIDA number is required for family members 18 years and above');
+        return false;
+    }
+});
 </script>
+
+<script src="js/validation.js"></script>
 
 <?php include 'includes/footer.php'; ?>

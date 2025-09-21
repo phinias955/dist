@@ -683,15 +683,15 @@ include 'includes/header.php';
                 <div class="hero-stats">
                     <div class="hero-stat">
                         <span class="stat-number">6</span>
-                        <span class="stat-label">Report Types</span>
+                        <span class="stat-label " style="color: white;">Report Types</span>
                     </div>
                     <div class="hero-stat">
                         <span class="stat-number">3</span>
-                        <span class="stat-label">Export Formats</span>
+                        <span class="stat-label" style="color: white;">Export Formats</span>
                     </div>
                     <div class="hero-stat">
                         <span class="stat-number">24/7</span>
-                        <span class="stat-label">Available</span>
+                        <span class="stat-label" style="color: white;">Available</span>
                     </div>
                 </div>
             </div>

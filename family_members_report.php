@@ -1,4 +1,8 @@
 <?php
+// Suppress warnings and notices for clean PDF/CSV output
+error_reporting(E_ERROR | E_PARSE);
+ini_set('display_errors', 0);
+
 session_start();
 require_once 'includes/functions.php';
 require_once 'config/database.php';
@@ -19,8 +23,9 @@ $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'];
 $user_location = getUserLocationInfo($user_id);
 
-// Get family members data based on user role
+// Get comprehensive family members data based on user role
 $report_data = [];
+$statistics = [];
 $report_title = '';
 $report_subtitle = '';
 
@@ -30,9 +35,34 @@ try {
         $report_title = 'Family Members Report - System Wide';
         $report_subtitle = 'All Wards and Villages';
         
+        // Get comprehensive statistics
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT fm.id) as total_family_members,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT v.id) as total_villages,
+                COUNT(DISTINCT w.id) as total_wards,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110,
+                SUM(CASE WHEN fm.gender = 'Male' THEN 1 ELSE 0 END) as male_count,
+                SUM(CASE WHEN fm.gender = 'Female' THEN 1 ELSE 0 END) as female_count
+            FROM family_members fm
+            JOIN residences r ON fm.residence_id = r.id
+            JOIN villages v ON r.village_id = v.id
+            JOIN wards w ON v.ward_id = w.id
+            WHERE r.status = 'active'
+        ";
+        $stmt = $pdo->query($stats_query);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $stmt = $pdo->query("
             SELECT fm.*, r.resident_name as residence_head, r.house_no, 
-                   v.village_name, w.ward_name
+                   v.village_name, w.ward_name,
+                   TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) as age
             FROM family_members fm
             JOIN residences r ON fm.residence_id = r.id
             JOIN villages v ON r.village_id = v.id
@@ -47,9 +77,33 @@ try {
         $report_title = 'Family Members Report - Ward Administration';
         $report_subtitle = 'Ward: ' . $user_location['ward_name'];
         
+        // Get comprehensive statistics for the ward
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT fm.id) as total_family_members,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT v.id) as total_villages,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110,
+                SUM(CASE WHEN fm.gender = 'Male' THEN 1 ELSE 0 END) as male_count,
+                SUM(CASE WHEN fm.gender = 'Female' THEN 1 ELSE 0 END) as female_count
+            FROM family_members fm
+            JOIN residences r ON fm.residence_id = r.id
+            JOIN villages v ON r.village_id = v.id
+            WHERE v.ward_id = ? AND r.status = 'active'
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['ward_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $stmt = $pdo->prepare("
             SELECT fm.*, r.resident_name as residence_head, r.house_no, 
-                   v.village_name, w.ward_name
+                   v.village_name, w.ward_name,
+                   TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) as age
             FROM family_members fm
             JOIN residences r ON fm.residence_id = r.id
             JOIN villages v ON r.village_id = v.id
@@ -65,9 +119,33 @@ try {
         $report_title = 'Family Members Report - Ward Executive Officer';
         $report_subtitle = 'Ward: ' . $user_location['ward_name'];
         
+        // Get comprehensive statistics for the ward
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT fm.id) as total_family_members,
+                COUNT(DISTINCT r.id) as total_residences,
+                COUNT(DISTINCT v.id) as total_villages,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110,
+                SUM(CASE WHEN fm.gender = 'Male' THEN 1 ELSE 0 END) as male_count,
+                SUM(CASE WHEN fm.gender = 'Female' THEN 1 ELSE 0 END) as female_count
+            FROM family_members fm
+            JOIN residences r ON fm.residence_id = r.id
+            JOIN villages v ON r.village_id = v.id
+            WHERE v.ward_id = ? AND r.status = 'active'
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['ward_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $stmt = $pdo->prepare("
             SELECT fm.*, r.resident_name as residence_head, r.house_no, 
-                   v.village_name, w.ward_name
+                   v.village_name, w.ward_name,
+                   TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) as age
             FROM family_members fm
             JOIN residences r ON fm.residence_id = r.id
             JOIN villages v ON r.village_id = v.id
@@ -83,9 +161,31 @@ try {
         $report_title = 'Family Members Report - Village Executive Officer';
         $report_subtitle = 'Village: ' . $user_location['village_name'];
         
+        // Get comprehensive statistics for the village
+        $stats_query = "
+            SELECT 
+                COUNT(DISTINCT fm.id) as total_family_members,
+                COUNT(DISTINCT r.id) as total_residences,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) < 18 THEN 1 ELSE 0 END) as children_under_18,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN 1 ELSE 0 END) as adults_18_24,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 25 AND 39 THEN 1 ELSE 0 END) as adults_25_39,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 40 AND 54 THEN 1 ELSE 0 END) as adults_40_54,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 55 AND 65 THEN 1 ELSE 0 END) as adults_55_65,
+                SUM(CASE WHEN TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) BETWEEN 66 AND 110 THEN 1 ELSE 0 END) as seniors_66_110,
+                SUM(CASE WHEN fm.gender = 'Male' THEN 1 ELSE 0 END) as male_count,
+                SUM(CASE WHEN fm.gender = 'Female' THEN 1 ELSE 0 END) as female_count
+            FROM family_members fm
+            JOIN residences r ON fm.residence_id = r.id
+            WHERE r.village_id = ? AND r.status = 'active'
+        ";
+        $stmt = $pdo->prepare($stats_query);
+        $stmt->execute([$user_location['village_id']]);
+        $statistics = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $stmt = $pdo->prepare("
             SELECT fm.*, r.resident_name as residence_head, r.house_no, 
-                   v.village_name, w.ward_name
+                   v.village_name, w.ward_name,
+                   TIMESTAMPDIFF(YEAR, fm.date_of_birth, CURDATE()) as age
             FROM family_members fm
             JOIN residences r ON fm.residence_id = r.id
             JOIN villages v ON r.village_id = v.id
@@ -106,190 +206,228 @@ if (isset($_GET['export'])) {
     $export_format = $_GET['export'];
     
     if ($export_format === 'pdf') {
-        // Generate PDF report
-        $html = '<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>' . $report_title . '</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-        h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        h2 { color: #666; margin-top: 30px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 11px; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .header-info { margin: 20px 0; }
-        .header-info p { margin: 5px 0; }
-        .page-break { page-break-before: always; }
-    </style>
-</head>
-<body>
-    <h1>' . $report_title . '</h1>
-    <div class="header-info">
-        <p><strong>Generated on:</strong> ' . date('Y-m-d H:i:s') . '</p>
-        <p><strong>Generated by:</strong> ' . $_SESSION['username'] . ' (' . getRoleDisplayName($user_role) . ')</p>
-        <p><strong>Scope:</strong> ' . $report_subtitle . '</p>
-    </div>';
+        // Start output buffering to prevent any output before PDF
+        ob_start();
         
+        // Include TCPDF library
+        require_once('vendor/autoload.php');
+        
+        // Generate dynamic heading based on user role
+        $report_heading = 'Family Members Report';
+        $report_description = 'Comprehensive family members data and demographics';
+        
+        // Create new PDF document
+        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        
+        // Set document information
+        $pdf->SetCreator('Ward Registration System');
+        $pdf->SetAuthor($_SESSION['username']);
+        $pdf->SetTitle($report_heading);
+        $pdf->SetSubject('Family Members Report');
+        $pdf->SetKeywords('Family, Members, Demographics, Report');
+        
+        // Set default header data
+        $pdf->SetHeaderData('', 0, $report_heading, $report_description);
+        
+        // Set header and footer fonts
+        $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
+        $pdf->setFooterFont(Array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
+        
+        // Set default monospaced font
+        $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        
+        // Set margins
+        $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+        $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
+        $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
+        
+        // Set auto page breaks
+        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+        
+        // Set image scale factor
+        $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
+        
+        // Add a page
+        $pdf->AddPage();
+        
+        // Set font
+        $pdf->SetFont('helvetica', 'B', 16);
+        
+        // Report title
+        $pdf->Cell(0, 15, $report_heading, 0, 1, 'C');
+        $pdf->Ln(5);
+        
+        // Report info
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 8, 'Generated on: ' . date('Y-m-d H:i:s'), 0, 1, 'L');
+        $pdf->Cell(0, 8, 'Generated by: ' . $_SESSION['username'] . ' (' . getRoleDisplayName($user_role) . ')', 0, 1, 'L');
+        $pdf->Cell(0, 8, 'Scope: ' . $report_subtitle, 0, 1, 'L');
+        $pdf->Ln(10);
+        
+        // Statistics Overview
+        if (!empty($statistics)) {
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->Cell(0, 10, 'Statistics Overview', 0, 1, 'L');
+            $pdf->Ln(5);
+            
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->SetTextColor(0);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetLineWidth(0.3);
+            $pdf->SetFont('helvetica', 'B');
+            
+            // Statistics table
+            $pdf->Cell(60, 8, 'Metric', 1, 0, 'C', 1);
+            $pdf->Cell(30, 8, 'Count', 1, 1, 'C', 1);
+            
+            $pdf->SetFont('helvetica', '');
+            $stats_data = array(
+                array('Total Family Members', $statistics['total_family_members'] ?? 0),
+                array('Total Residences', $statistics['total_residences'] ?? 0),
+                array('Male Members', $statistics['male_count'] ?? 0),
+                array('Female Members', $statistics['female_count'] ?? 0),
+                array('Children (Under 18)', $statistics['children_under_18'] ?? 0),
+                array('Young Adults (18-24)', $statistics['adults_18_24'] ?? 0),
+                array('Adults (25-39)', $statistics['adults_25_39'] ?? 0),
+                array('Middle Age (40-54)', $statistics['adults_40_54'] ?? 0),
+                array('Pre-Senior (55-65)', $statistics['adults_55_65'] ?? 0),
+                array('Seniors (66-110)', $statistics['seniors_66_110'] ?? 0)
+            );
+            
+            if (isset($statistics['total_wards'])) {
+                $stats_data[] = array('Total Wards', $statistics['total_wards']);
+            }
+            if (isset($statistics['total_villages'])) {
+                $stats_data[] = array('Total Villages', $statistics['total_villages']);
+            }
+            
+            foreach ($stats_data as $stat) {
+                $pdf->Cell(60, 8, $stat[0], 1, 0, 'L', 0);
+                $pdf->Cell(30, 8, $stat[1], 1, 1, 'C', 0);
+            }
+            $pdf->Ln(10);
+        }
+        
+        // Family Members Data Table
         if (!empty($report_data)) {
-            $html .= '<table>
-                <thead>
-                    <tr>
-                        <th>Ward</th>
-                        <th>Village</th>
-                        <th>Residence Head</th>
-                        <th>House No</th>
-                        <th>Family Member Name</th>
-                        <th>Relationship</th>
-                        <th>Gender</th>
-                        <th>Date of Birth</th>
-                        <th>Age</th>
-                        <th>NIDA Number</th>
-                        <th>Phone</th>
-                        <th>Occupation</th>
-                        <th>Education Level</th>
-                        <th>Employment Status</th>
-                        <th>Email</th>
-                    </tr>
-                </thead>
-                <tbody>';
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->Cell(0, 10, 'Family Members Data', 0, 1, 'L');
+            $pdf->Ln(5);
             
+            $pdf->SetFont('helvetica', '', 8);
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->SetTextColor(0);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetLineWidth(0.3);
+            $pdf->SetFont('helvetica', 'B');
+            
+            // Table headers
+            $pdf->Cell(25, 8, 'Ward', 1, 0, 'C', 1);
+            $pdf->Cell(25, 8, 'Village', 1, 0, 'C', 1);
+            $pdf->Cell(30, 8, 'Residence Head', 1, 0, 'C', 1);
+            $pdf->Cell(15, 8, 'House No', 1, 0, 'C', 1);
+            $pdf->Cell(30, 8, 'Family Member', 1, 0, 'C', 1);
+            $pdf->Cell(20, 8, 'Relationship', 1, 0, 'C', 1);
+            $pdf->Cell(15, 8, 'Gender', 1, 0, 'C', 1);
+            $pdf->Cell(20, 8, 'Age', 1, 0, 'C', 1);
+            $pdf->Cell(25, 8, 'NIDA Number', 1, 1, 'C', 1);
+            
+            $pdf->SetFont('helvetica', '', 7);
             foreach ($report_data as $row) {
-                $age = '';
-                if (!empty($row['date_of_birth'])) {
-                    $birth_date = new DateTime($row['date_of_birth']);
-                    $today = new DateTime();
-                    $age = $today->diff($birth_date)->y;
-                }
-                
-                $html .= '<tr>
-                    <td>' . htmlspecialchars($row['ward_name']) . '</td>
-                    <td>' . htmlspecialchars($row['village_name']) . '</td>
-                    <td>' . htmlspecialchars($row['residence_head']) . '</td>
-                    <td>' . htmlspecialchars($row['house_no']) . '</td>
-                    <td>' . htmlspecialchars($row['name']) . '</td>
-                    <td>' . htmlspecialchars($row['relationship']) . '</td>
-                    <td>' . htmlspecialchars($row['gender']) . '</td>
-                    <td>' . htmlspecialchars($row['date_of_birth']) . '</td>
-                    <td>' . $age . '</td>
-                    <td>' . htmlspecialchars($row['nida_number']) . '</td>
-                    <td>' . htmlspecialchars($row['phone']) . '</td>
-                    <td>' . htmlspecialchars($row['occupation']) . '</td>
-                    <td>' . htmlspecialchars($row['education_level']) . '</td>
-                    <td>' . htmlspecialchars($row['employment_status']) . '</td>
-                    <td>' . htmlspecialchars($row['email']) . '</td>
-                </tr>';
+                $pdf->Cell(25, 8, $row['ward_name'], 1, 0, 'L', 0);
+                $pdf->Cell(25, 8, $row['village_name'], 1, 0, 'L', 0);
+                $pdf->Cell(30, 8, $row['residence_head'], 1, 0, 'L', 0);
+                $pdf->Cell(15, 8, $row['house_no'], 1, 0, 'C', 0);
+                $pdf->Cell(30, 8, $row['name'], 1, 0, 'L', 0);
+                $pdf->Cell(20, 8, $row['relationship'], 1, 0, 'C', 0);
+                $pdf->Cell(15, 8, $row['gender'], 1, 0, 'C', 0);
+                $pdf->Cell(20, 8, $row['age'], 1, 0, 'C', 0);
+                $pdf->Cell(25, 8, $row['nida_number'], 1, 1, 'C', 0);
             }
-            
-            $html .= '</tbody>
-            </table>';
         } else {
-            $html .= '<p>No data available for the selected criteria.</p>';
+            $pdf->SetFont('helvetica', '', 12);
+            $pdf->Cell(0, 10, 'No family members data available.', 0, 1, 'C');
         }
         
-        $html .= '</body></html>';
+        // Footer
+        $pdf->SetY(-15);
+        $pdf->SetFont('helvetica', 'I', 8);
+        $pdf->Cell(0, 10, 'Generated by Ward Registration System on ' . date('Y-m-d H:i:s'), 0, 0, 'C');
         
-        // Set headers for HTML display (not PDF)
-        header('Content-Type: text/html; charset=UTF-8');
-        
-        // Output HTML that can be printed as PDF by browser
-        echo $html;
-        exit();
-        
-    } elseif ($export_format === 'excel') {
-        // Generate Excel report
-        $filename = 'family_members_report_' . date('Y-m-d_H-i-s') . '.xlsx';
-        
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
-        
-        // Create Excel-compatible format
-        echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        echo "<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\">\n";
-        echo "<Worksheet ss:Name=\"Family Members Report\">\n";
-        echo "<Table>\n";
-        
-        // Header row
-        echo "<Row>\n";
-        $headers = ['Ward', 'Village', 'Residence Head', 'House No', 'Family Member Name', 
-                   'Relationship', 'Gender', 'Date of Birth', 'Age', 'NIDA Number', 
-                   'Phone', 'Occupation', 'Education Level', 'Employment Status', 'Email'];
-        
-        foreach ($headers as $header) {
-            echo "<Cell><Data ss:Type=\"String\">" . htmlspecialchars($header) . "</Data></Cell>\n";
-        }
-        echo "</Row>\n";
-        
-        // Data rows
-        foreach ($report_data as $data_row) {
-            echo "<Row>\n";
-            
-            $age = '';
-            if (!empty($data_row['date_of_birth'])) {
-                $birth_date = new DateTime($data_row['date_of_birth']);
-                $today = new DateTime();
-                $age = $today->diff($birth_date)->y;
-            }
-            
-            $values = [
-                $data_row['ward_name'], $data_row['village_name'], $data_row['residence_head'], 
-                $data_row['house_no'], $data_row['name'], $data_row['relationship'],
-                $data_row['gender'], $data_row['date_of_birth'], $age, $data_row['nida_number'],
-                $data_row['phone'], $data_row['occupation'], $data_row['education_level'],
-                $data_row['employment_status'], $data_row['email']
-            ];
-            
-            foreach ($values as $value) {
-                echo "<Cell><Data ss:Type=\"String\">" . htmlspecialchars($value) . "</Data></Cell>\n";
-            }
-            echo "</Row>\n";
-        }
-        
-        echo "</Table>\n";
-        echo "</Worksheet>\n";
-        echo "</Workbook>\n";
+        // Clean output buffer and output PDF
+        ob_end_clean();
+        $filename = 'Family_Members_Report_' . date('Y-m-d_H-i-s') . '.pdf';
+        $pdf->Output($filename, 'D');
         exit();
         
     } elseif ($export_format === 'csv') {
-        // Generate CSV report
-        $filename = 'family_members_report_' . date('Y-m-d_H-i-s') . '.csv';
+        // Start output buffering to prevent any output before CSV
+        ob_start();
         
-        header('Content-Type: text/csv');
+        // Generate CSV report
+        $filename = 'Family_Members_Report_' . date('Y-m-d_H-i-s') . '.csv';
+        
+        // Clean output buffer and set headers
+        ob_end_clean();
+        header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
+        
+        // Add BOM for UTF-8 support in Excel
+        echo "\xEF\xBB\xBF";
         
         $output = fopen('php://output', 'w');
         
-        // CSV headers
-        fputcsv($output, ['Ward', 'Village', 'Residence Head', 'House No', 'Family Member Name', 
-                         'Relationship', 'Gender', 'Date of Birth', 'Age', 'NIDA Number', 
-                         'Phone', 'Occupation', 'Education Level', 'Employment Status', 'Email']);
+        // Write report header
+        fputcsv($output, array('Ward Registration System - Family Members Report'));
+        fputcsv($output, array('Generated on: ' . date('Y-m-d H:i:s')));
+        fputcsv($output, array('Generated by: ' . $_SESSION['username'] . ' (' . getRoleDisplayName($user_role) . ')'));
+        fputcsv($output, array('Scope: ' . $report_subtitle));
+        fputcsv($output, array(''));
         
-        // Data rows
-        foreach ($report_data as $data_row) {
-            $age = '';
-            if (!empty($data_row['date_of_birth'])) {
-                $birth_date = new DateTime($data_row['date_of_birth']);
-                $today = new DateTime();
-                $age = $today->diff($birth_date)->y;
-            }
+        // Statistics Overview
+        if (!empty($statistics)) {
+            fputcsv($output, array('STATISTICS OVERVIEW'));
+            fputcsv($output, array('Metric', 'Count'));
+            fputcsv($output, array('Total Family Members', $statistics['total_family_members'] ?? 0));
+            fputcsv($output, array('Total Residences', $statistics['total_residences'] ?? 0));
+            fputcsv($output, array('Male Members', $statistics['male_count'] ?? 0));
+            fputcsv($output, array('Female Members', $statistics['female_count'] ?? 0));
+            fputcsv($output, array('Children (Under 18)', $statistics['children_under_18'] ?? 0));
+            fputcsv($output, array('Young Adults (18-24)', $statistics['adults_18_24'] ?? 0));
+            fputcsv($output, array('Adults (25-39)', $statistics['adults_25_39'] ?? 0));
+            fputcsv($output, array('Middle Age (40-54)', $statistics['adults_40_54'] ?? 0));
+            fputcsv($output, array('Pre-Senior (55-65)', $statistics['adults_55_65'] ?? 0));
+            fputcsv($output, array('Seniors (66-110)', $statistics['seniors_66_110'] ?? 0));
             
-            fputcsv($output, [
-                $data_row['ward_name'], $data_row['village_name'], $data_row['residence_head'], 
-                $data_row['house_no'], $data_row['name'], $data_row['relationship'],
-                $data_row['gender'], $data_row['date_of_birth'], $age, $data_row['nida_number'],
-                $data_row['phone'], $data_row['occupation'], $data_row['education_level'],
-                $data_row['employment_status'], $data_row['email']
-            ]);
+            if (isset($statistics['total_wards'])) {
+                fputcsv($output, array('Total Wards', $statistics['total_wards']));
+            }
+            if (isset($statistics['total_villages'])) {
+                fputcsv($output, array('Total Villages', $statistics['total_villages']));
+            }
+            fputcsv($output, array(''));
+        }
+        
+        // Family Members Data
+        fputcsv($output, array('FAMILY MEMBERS DATA'));
+        fputcsv($output, array('Ward', 'Village', 'Residence Head', 'House No', 'Family Member Name', 
+                              'Relationship', 'Gender', 'Date of Birth', 'Age', 'NIDA Number', 
+                              'Phone', 'Education Level', 'Employment Status'));
+        
+        foreach ($report_data as $row) {
+            fputcsv($output, array($row['ward_name'], $row['village_name'], $row['residence_head'], 
+                                 $row['house_no'], $row['name'], $row['relationship'], 
+                                 $row['gender'], $row['date_of_birth'], $row['age'], $row['nida_number'], 
+                                 $row['phone'], $row['education_level'], $row['employment_status']));
         }
         
         fclose($output);
         exit();
     }
 }
-
-include 'includes/header.php';
 ?>
 
 <!DOCTYPE html>
@@ -297,439 +435,708 @@ include 'includes/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $report_title; ?> - Residence Management System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title><?php echo $report_title; ?> - Ward Registration System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary: #4361ee;
-            --primary-dark: #3a56d4;
-            --secondary: #6c757d;
-            --success: #198754;
-            --info: #0dcaf0;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --light: #f8f9fa;
-            --dark: #212529;
-            --gray-100: #f8f9fa;
-            --gray-200: #e9ecef;
-            --gray-300: #dee2e6;
-            --gray-400: #ced4da;
-            --gray-500: #adb5bd;
-            --gray-600: #6c757d;
-            --gray-700: #495057;
-            --gray-800: #343a40;
-            --gray-900: #212529;
-            --border-radius: 12px;
-            --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            --transition: all 0.3s ease;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f5f7fb;
-            color: var(--gray-800);
-            line-height: 1.6;
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .dashboard-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+        .max-w-6xl {
+            max-width: 72rem;
         }
 
-        /* Hero Section */
-        .dashboard-hero {
-            background: linear-gradient(135deg, var(--primary) 0%, #5e72e4 100%);
-            border-radius: var(--border-radius);
-            padding: 30px;
-            color: white;
-            margin-bottom: 24px;
-            box-shadow: var(--box-shadow);
-            position: relative;
-            overflow: hidden;
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .hero-background {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
+        .space-y-6 > * + * {
+            margin-top: 1.5rem;
         }
 
-        .hero-pattern {
-            position: absolute;
-            top: -50px;
-            right: -50px;
-            width: 300px;
-            height: 300px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
+        .bg-white {
+            background-color: #ffffff;
         }
 
-        .hero-pattern::after {
-            content: '';
-            position: absolute;
-            bottom: -80px;
-            left: -80px;
-            width: 250px;
-            height: 250px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
+        .rounded-lg {
+            border-radius: 0.5rem;
         }
 
-        .hero-content {
-            position: relative;
-            z-index: 2;
+        .shadow-md {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 16px;
-            border-radius: 50px;
-            margin-bottom: 16px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .p-6 {
+            padding: 1.5rem;
         }
 
-        .hero-title {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        .title-highlight {
-            color: #ffd166;
-        }
-
-        .hero-description {
-            font-size: 16px;
-            opacity: 0.9;
-            max-width: 600px;
-            margin-bottom: 24px;
-        }
-
-        .hero-actions {
+        .flex {
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
         }
 
-        .cta-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: var(--transition);
-            border: none;
-            cursor: pointer;
-        }
-
-        .cta-button.primary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .cta-button.primary:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-
-        .cta-button.secondary {
-            background: transparent;
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-
-        .cta-button.secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateY(-2px);
-        }
-
-        /* Data Table */
-        .data-table-container {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            overflow: hidden;
-        }
-
-        .table-header {
-            background: linear-gradient(135deg, var(--gray-800), var(--gray-700));
-            color: white;
-            padding: 20px;
-            display: flex;
+        .justify-between {
             justify-content: space-between;
+        }
+
+        .items-start {
+            align-items: flex-start;
+        }
+
+        .items-center {
             align-items: center;
         }
 
-        .table-header h3 {
-            margin: 0;
-            font-size: 18px;
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+
+        .text-2xl {
+            font-size: 1.5rem;
+            line-height: 2rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+
+        .text-lg {
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+            line-height: 1rem;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .font-semibold {
             font-weight: 600;
         }
 
-        .record-count {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
+        .font-medium {
             font-weight: 500;
         }
 
-        .table-wrapper {
+        .text-gray-800 {
+            color: #1f2937;
+        }
+
+        .text-gray-600 {
+            color: #4b5563;
+        }
+
+        .text-gray-500 {
+            color: #6b7280;
+        }
+
+        .text-gray-900 {
+            color: #111827;
+        }
+
+        .space-x-2 > * + * {
+            margin-left: 0.5rem;
+        }
+
+        .space-x-4 > * + * {
+            margin-left: 1rem;
+        }
+
+        .space-y-2 > * + * {
+            margin-top: 0.5rem;
+        }
+
+        .space-y-4 > * + * {
+            margin-top: 1rem;
+        }
+
+        .bg-gray-500 {
+            background-color: #6b7280;
+        }
+
+        .bg-blue-600 {
+            background-color: #2563eb;
+        }
+
+        .bg-blue-100 {
+            background-color: #dbeafe;
+        }
+
+        .bg-blue-800 {
+            color: #1e40af;
+        }
+
+        .bg-green-100 {
+            background-color: #dcfce7;
+        }
+
+        .bg-green-800 {
+            color: #166534;
+        }
+
+        .bg-yellow-100 {
+            background-color: #fef3c7;
+        }
+
+        .bg-yellow-800 {
+            color: #92400e;
+        }
+
+        .bg-purple-100 {
+            background-color: #e9d5ff;
+        }
+
+        .bg-purple-800 {
+            color: #6b21a8;
+        }
+
+        .bg-red-100 {
+            background-color: #fee2e2;
+        }
+
+        .bg-red-800 {
+            color: #991b1b;
+        }
+
+        .bg-gray-100 {
+            background-color: #f3f4f6;
+        }
+
+        .bg-gray-800 {
+            color: #1f2937;
+        }
+
+        .text-white {
+            color: #ffffff;
+        }
+
+        .text-blue-600 {
+            color: #2563eb;
+        }
+
+        .text-red-600 {
+            color: #dc2626;
+        }
+
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .px-3 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+
+        .py-1 {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+
+        .rounded-md {
+            border-radius: 0.375rem;
+        }
+
+        .rounded-full {
+            border-radius: 9999px;
+        }
+
+        .hover\:bg-gray-600:hover {
+            background-color: #4b5563;
+        }
+
+        .hover\:bg-blue-700:hover {
+            background-color: #1d4ed8;
+        }
+
+        .transition {
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+
+        .duration-200 {
+            transition-duration: 200ms;
+        }
+
+        .mr-2 {
+            margin-right: 0.5rem;
+        }
+
+        .mr-4 {
+            margin-right: 1rem;
+        }
+
+        .mt-1 {
+            margin-top: 0.25rem;
+        }
+
+        .mt-6 {
+            margin-top: 1.5rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-3 {
+            margin-bottom: 0.75rem;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        .w-8 {
+            width: 2rem;
+        }
+
+        .h-2 {
+            height: 0.5rem;
+        }
+
+        .h-8 {
+            height: 2rem;
+        }
+
+        .bg-gray-200 {
+            background-color: #e5e7eb;
+        }
+
+        .bg-blue-500 {
+            background-color: #3b82f6;
+        }
+
+        .bg-green-500 {
+            background-color: #10b981;
+        }
+
+        .bg-red-500 {
+            background-color: #ef4444;
+        }
+
+        .bg-red-50 {
+            background-color: #fef2f2;
+        }
+
+        .bg-green-50 {
+            background-color: #f0fdf4;
+        }
+
+        .bg-gray-50 {
+            background-color: #f9fafb;
+        }
+
+        .text-red-800 {
+            color: #991b1b;
+        }
+
+        .text-green-800 {
+            color: #166534;
+        }
+
+        .text-blue-800 {
+            color: #1e40af;
+        }
+
+        .text-yellow-800 {
+            color: #92400e;
+        }
+
+        .text-purple-800 {
+            color: #6b21a8;
+        }
+
+        .text-red-800 {
+            color: #991b1b;
+        }
+
+        .text-gray-800 {
+            color: #1f2937;
+        }
+
+        .text-gray-600 {
+            color: #4b5563;
+        }
+
+        .text-gray-500 {
+            color: #6b7280;
+        }
+
+        .text-gray-900 {
+            color: #111827;
+        }
+
+        .text-gray-700 {
+            color: #374151;
+        }
+
+        .block {
+            display: block;
+        }
+
+        .flex-1 {
+            flex: 1 1 0%;
+        }
+
+        .grid {
+            display: grid;
+        }
+
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
+        .gap-6 {
+            gap: 1.5rem;
+        }
+
+        .gap-8 {
+            gap: 2rem;
+        }
+
+        .gap-2 {
+            gap: 0.5rem;
+        }
+
+        .p-4 {
+            padding: 1rem;
+        }
+
+        .font-mono {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .overflow-x-auto {
             overflow-x: auto;
         }
 
-        .modern-table {
+        .table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
         }
 
-        .modern-table thead th {
-            background: var(--gray-100);
-            color: var(--gray-700);
-            padding: 16px 12px;
-            text-align: left;
+        .table th {
+            background-color: #f8f9fa;
+            color: #374151;
             font-weight: 600;
-            border-bottom: 2px solid var(--gray-200);
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
         }
 
-        .modern-table tbody tr {
-            transition: var(--transition);
-            border-bottom: 1px solid var(--gray-200);
-        }
-
-        .modern-table tbody tr:hover {
-            background: var(--gray-50);
-        }
-
-        .modern-table tbody td {
-            padding: 16px 12px;
+        .table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
             vertical-align: middle;
         }
 
-        .data-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
+        .table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
             font-weight: 500;
+            border-radius: 9999px;
         }
 
-        .data-badge.primary {
-            background: rgba(67, 97, 238, 0.1);
-            color: var(--primary);
+        .badge-primary {
+            background-color: #3b82f6;
+            color: white;
         }
 
-        .data-badge.success {
-            background: rgba(25, 135, 84, 0.1);
-            color: var(--success);
+        .badge-success {
+            background-color: #10b981;
+            color: white;
         }
 
-        .data-badge.warning {
-            background: rgba(255, 193, 7, 0.1);
-            color: var(--warning);
+        .badge-info {
+            background-color: #06b6d4;
+            color: white;
         }
 
-        .data-badge.info {
-            background: rgba(13, 202, 240, 0.1);
-            color: var(--info);
+        .badge-warning {
+            background-color: #f59e0b;
+            color: white;
         }
 
-        .data-badge.danger {
-            background: rgba(220, 53, 69, 0.1);
-            color: var(--danger);
+        .badge-danger {
+            background-color: #ef4444;
+            color: white;
         }
 
-        .data-badge.secondary {
-            background: rgba(108, 117, 125, 0.1);
-            color: var(--secondary);
+        .badge-secondary {
+            background-color: #6b7280;
+            color: white;
         }
 
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .dashboard-container {
-                padding: 15px;
+        .avatar-circle {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .d-flex {
+            display: flex;
+        }
+
+        .align-items-center {
+            align-items: center;
+        }
+
+        .me-2 {
+            margin-right: 0.5rem;
+        }
+
+        .text-primary {
+            color: #3b82f6;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            color: #d1d5db;
+            margin-bottom: 1.5rem;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.75rem;
+        }
+
+        .empty-desc {
+            font-size: 1rem;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        @media (min-width: 768px) {
+            .md\:grid-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
-            
-            .dashboard-hero {
-                padding: 20px;
-            }
-            
-            .hero-title {
-                font-size: 24px;
-            }
-            
-            .hero-actions {
-                flex-direction: column;
-            }
-            
-            .modern-table {
-                font-size: 12px;
-            }
-            
-            .modern-table thead th,
-            .modern-table tbody td {
-                padding: 12px 8px;
+        }
+
+        @media (min-width: 1024px) {
+            .lg\:grid-cols-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
         }
 
-        /* Animation */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease forwards;
+        .md\:col-span-2 {
+            grid-column: span 2 / span 2;
         }
     </style>
 </head>
 <body>
-    <div class="dashboard-container">
-        <!-- Hero Section -->
-        <div class="dashboard-hero fade-in">
-            <div class="hero-background">
-                <div class="hero-pattern"></div>
+    <?php include 'includes/header.php'; ?>
+    
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800"><?php echo $report_title; ?></h1>
+                    <p class="text-gray-600"><?php echo $report_subtitle; ?></p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="reports_dashboard.php" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-200">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Reports
+                    </a>
+                    <a href="?export=pdf" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200">
+                        <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                    </a>
+                    <a href="?export=csv" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition duration-200">
+                        <i class="fas fa-file-csv mr-2"></i>Export CSV
+                    </a>
+                </div>
             </div>
-            <div class="hero-content">
-                <div class="hero-badge">
-                    <span class="badge-icon">👥</span>
-                    <span class="badge-text">Family Members Report</span>
-                </div>
-                <h1 class="hero-title">
-                    <?php echo $report_title; ?>
-                    <span class="title-highlight">Family</span>
-                </h1>
-                <p class="hero-description">
-                    <?php echo $report_subtitle; ?><br>
-                    Comprehensive family member information and detailed analytics.
-                </p>
-                <div class="hero-actions">
-                    <a href="?export=pdf" class="cta-button primary">
-                        <i class="fas fa-file-pdf"></i>
-                        <span>Export PDF</span>
-                    </a>
-                    <a href="?export=excel" class="cta-button secondary">
-                        <i class="fas fa-file-excel"></i>
-                        <span>Export Excel</span>
-                    </a>
-                    <a href="?export=csv" class="cta-button secondary">
-                        <i class="fas fa-file-csv"></i>
-                        <span>Export CSV</span>
-                    </a>
-                    <a href="reports_dashboard.php" class="cta-button secondary">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Reports</span>
-                    </a>
-                </div>
+            
+            <!-- Report Info -->
+            <div class="flex space-x-4 text-sm text-gray-600">
+                <span><i class="fas fa-user-circle mr-1"></i> <?php echo $_SESSION['username']; ?></span>
+                <span><i class="fas fa-clock mr-1"></i> <?php echo date('F j, Y, g:i a'); ?></span>
+                <span><i class="fas fa-list mr-1"></i> <?php echo count($report_data); ?> records</span>
             </div>
         </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                
-                <div class="card-body">
-                    <?php if (isset($error_message)): ?>
-                        <div class="alert alert-danger">
-                            <?php echo $error_message; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="row mb-3">
-                           
-                            <div class="col-md-6 text-right">
-                                <p class="text-muted">
-                                    <strong>Generated on:</strong> <?php echo date('Y-m-d H:i:s'); ?><br>
-                                    <strong>Generated by:</strong> <?php echo $_SESSION['username']; ?> (<?php echo getRoleDisplayName($user_role); ?>)<br>
-                                    <strong>Total Records:</strong> <?php echo count($report_data); ?>
-                                </p>
-                            </div>
-                        </div>
+        <!-- Report Content -->
+        <div class="bg-white rounded-lg shadow-md p-6">
 
-                        <?php if (!empty($report_data)): ?>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-bordered">
-                                    <thead class="thead-dark">
-                                        <tr>
-                                            <th>Ward</th>
-                                            <th>Village</th>
-                                            <th>Residence Head</th>
-                                            <th>House No</th>
-                                            <th>Family Member Name</th>
-                                            <th>Relationship</th>
-                                            <th>Gender</th>
-                                            <th>Date of Birth</th>
-                                            <th>Age</th>
-                                            <th>NIDA Number</th>
-                                            <th>Phone</th>
-                                            <th>Occupation</th>
-                                            <th>Education Level</th>
-                                            <th>Employment Status</th>
-                                            <th>Email</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($report_data as $row): ?>
-                                            <?php
-                                            $age = '';
-                                            if (!empty($row['date_of_birth'])) {
-                                                $birth_date = new DateTime($row['date_of_birth']);
-                                                $today = new DateTime();
-                                                $age = $today->diff($birth_date)->y;
-                                            }
-                                            ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($row['ward_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['village_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['residence_head']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['house_no']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['relationship']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['gender']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['date_of_birth']); ?></td>
-                                                <td><?php echo $age; ?></td>
-                                                <td><?php echo htmlspecialchars($row['nida_number']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['phone']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['occupation']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['education_level']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['employment_status']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['email']); ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="alert alert-info">
-                                <h5>No Data Available</h5>
-                                <p>No family member data found for the selected criteria.</p>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+            <?php if (isset($error_message)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h3 class="empty-title">Error Generating Report</h3>
+                    <p class="empty-desc"><?php echo $error_message; ?></p>
+                    <div class="empty-actions">
+                        <a href="reports_dashboard.php" class="btn">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
                 </div>
-            </div>
+            <?php elseif (!empty($report_data)): ?>
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-users mr-2"></i>Family Members Data
+                </h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ward</th>
+                                <th>Village</th>
+                                <th>Residence Head</th>
+                                <th>House No</th>
+                                <th>Family Member</th>
+                                <th>Relationship</th>
+                                <th>Gender</th>
+                                <th>Age</th>
+                                <th>NIDA Number</th>
+                                <th>Phone</th>
+                                <th>Education</th>
+                                <th>Employment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($report_data as $index => $row): ?>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-map-marker-alt text-red-600 mr-2"></i>
+                                        <?php echo htmlspecialchars($row['ward_name']); ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($row['village_name']); ?></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle mr-2">
+                                                <?php echo strtoupper(substr($row['residence_head'], 0, 1)); ?>
+                                            </div>
+                                            <?php echo htmlspecialchars($row['residence_head']); ?>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge badge-primary"><?php echo htmlspecialchars($row['house_no']); ?></span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle mr-2">
+                                                <?php echo strtoupper(substr($row['name'], 0, 1)); ?>
+                                            </div>
+                                            <?php echo htmlspecialchars($row['name']); ?>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge badge-info"><?php echo htmlspecialchars($row['relationship']); ?></span></td>
+                                    <td>
+                                        <span class="badge <?php echo $row['gender'] === 'Male' ? 'badge-info' : 'badge-warning'; ?>">
+                                            <?php echo htmlspecialchars($row['gender']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-secondary">
+                                            <?php echo $row['age']; ?> years
+                                        </span>
+                                    </td>
+                                    <td class="font-mono"><?php echo htmlspecialchars($row['nida_number']); ?></td>
+                                    <td>
+                                        <a href="tel:<?php echo htmlspecialchars($row['phone']); ?>" class="text-blue-600">
+                                            <i class="fas fa-phone-alt mr-1"></i> <?php echo htmlspecialchars($row['phone']); ?>
+                                        </a>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($row['education_level']); ?></td>
+                                    <td>
+                                        <span class="badge <?php echo $row['employment_status'] === 'Employed' ? 'badge-success' : 'badge-danger'; ?>">
+                                            <?php echo htmlspecialchars($row['employment_status']); ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3 class="empty-title">No Family Members Found</h3>
+                    <p class="empty-desc">There are no family members registered in your assigned area.</p>
+                    <div class="empty-actions">
+                        <a href="reports_dashboard.php" class="btn">
+                            <i class="fas fa-arrow-left"></i> Back to Reports
+                        </a>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
-</div>
 
-<?php include 'includes/footer.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
